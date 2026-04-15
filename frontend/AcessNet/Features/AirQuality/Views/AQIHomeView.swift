@@ -17,6 +17,12 @@ struct AQIHomeView: View {
     @State private var showARView = false
     @State private var isLoadingAQI: Bool = false
 
+    // ML Prediction data
+    @State private var mlPrediction: MLPredictionResponse?
+    @State private var aiAnalysis: AIAnalysisResponse?
+    @State private var bestTimeData: BestTimeResponse?
+    @State private var dataLoadError: String?
+
     enum ForecastTab {
         case hourly
         case daily
@@ -48,6 +54,21 @@ struct AQIHomeView: View {
                         // AQI Info Button (combines AQI Card + PM Indicators)
                         aqiInfoButton
 
+                        // ML Prediction Card (NEW)
+                        if let prediction = mlPrediction, prediction.model_available == true {
+                            mlPredictionCard(prediction)
+                        }
+
+                        // AI Analysis Card (NEW)
+                        if let analysis = aiAnalysis, analysis.summary != nil {
+                            aiAnalysisCard(analysis)
+                        }
+
+                        // Best Time Card (NEW)
+                        if let bestTime = bestTimeData {
+                            bestTimeCard(bestTime)
+                        }
+
                         // AR Button
                         arButton
 
@@ -73,6 +94,58 @@ struct AQIHomeView: View {
         .sheet(isPresented: $showSearchModal) {
             LocationSearchModal(searchText: $searchText, onLocationSelected: handleLocationSelection)
         }
+        .task {
+            await loadBackendData()
+        }
+    }
+
+    // MARK: - Backend Data Loading
+
+    private func loadBackendData() async {
+        isLoadingAQI = true
+        dataLoadError = nil
+
+        let lat = 19.4326  // CDMX centro (TODO: usar ubicación real del usuario)
+        let lon = -99.1332
+
+        let api = AirQualityAPIService.shared
+
+        // Cargar análisis + predicción ML
+        do {
+            let analysis = try await api.fetchAnalysis(latitude: lat, longitude: lon, mode: "walk")
+            await MainActor.run {
+                airQualityData = AirQualityData(
+                    aqi: analysis.combined_aqi,
+                    pm25: analysis.pollutants?.pm25?.value ?? 0,
+                    pm10: analysis.pollutants?.pm10?.value ?? 0,
+                    location: "CDMX Centro",
+                    city: "Ciudad de México",
+                    distance: 0,
+                    temperature: 18,
+                    humidity: 55,
+                    windSpeed: 5,
+                    uvIndex: 0,
+                    weatherCondition: .cloudy,
+                    lastUpdate: Date()
+                )
+                mlPrediction = analysis.ml_prediction
+                aiAnalysis = analysis.ai_analysis
+                print("✅ Backend data loaded: AQI=\(analysis.combined_aqi)")
+            }
+        } catch {
+            print("⚠️ Analysis load error: \(error)")
+            await MainActor.run { dataLoadError = error.localizedDescription }
+        }
+
+        // Cargar mejor hora
+        do {
+            let bestTime = try await api.fetchBestTime(latitude: lat, longitude: lon, mode: "bike", hours: 12)
+            await MainActor.run { bestTimeData = bestTime }
+        } catch {
+            print("⚠️ BestTime load error: \(error)")
+        }
+
+        await MainActor.run { isLoadingAQI = false }
     }
 
     // MARK: - View Components
@@ -404,6 +477,225 @@ struct AQIHomeView: View {
         }
         .padding(.horizontal)
     }
+
+    // MARK: - ML Prediction Card
+
+    private func mlPredictionCard(_ prediction: MLPredictionResponse) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Image(systemName: "brain.head.profile")
+                    .foregroundColor(.cyan)
+                Text("ML Prediction")
+                    .font(.headline.bold())
+                    .foregroundColor(.white)
+                Spacer()
+                if let trend = prediction.trend {
+                    HStack(spacing: 4) {
+                        Image(systemName: trend == "subiendo" ? "arrow.up.right" : trend == "bajando" ? "arrow.down.right" : "arrow.right")
+                            .foregroundColor(trend == "subiendo" ? .orange : trend == "bajando" ? .green : .white)
+                        Text(trend.capitalized)
+                            .font(.caption.bold())
+                            .foregroundColor(trend == "subiendo" ? .orange : trend == "bajando" ? .green : .white)
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 4)
+                    .background(
+                        Capsule().fill(.white.opacity(0.15))
+                    )
+                }
+            }
+
+            if let preds = prediction.predictions {
+                HStack(spacing: 0) {
+                    ForEach(["1h", "3h", "6h"], id: \.self) { key in
+                        if let p = preds[key] {
+                            VStack(spacing: 6) {
+                                Text("In \(key)")
+                                    .font(.caption)
+                                    .foregroundColor(.white.opacity(0.7))
+                                Text("\(p.aqi)")
+                                    .font(.title2.bold())
+                                    .foregroundColor(Color(hex: p.color ?? "#ffffff"))
+                                Text(p.risk_level.capitalized)
+                                    .font(.caption2)
+                                    .foregroundColor(.white.opacity(0.6))
+                            }
+                            .frame(maxWidth: .infinity)
+                        }
+                    }
+                }
+            }
+        }
+        .padding()
+        .background(
+            RoundedRectangle(cornerRadius: 20)
+                .fill(
+                    LinearGradient(
+                        colors: [Color.cyan.opacity(0.3), Color.blue.opacity(0.2)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 20)
+                        .stroke(.white.opacity(0.2), lineWidth: 1)
+                )
+        )
+        .padding(.horizontal)
+    }
+
+    // MARK: - AI Analysis Card
+
+    private func aiAnalysisCard(_ analysis: AIAnalysisResponse) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Image(systemName: "sparkles")
+                    .foregroundColor(.purple)
+                Text("AI Analysis")
+                    .font(.headline.bold())
+                    .foregroundColor(.white)
+            }
+
+            if let summary = analysis.summary {
+                Text(summary)
+                    .font(.subheadline)
+                    .foregroundColor(.white.opacity(0.9))
+                    .lineLimit(3)
+            }
+
+            if let rec = analysis.health_recommendation {
+                HStack(alignment: .top, spacing: 8) {
+                    Image(systemName: "heart.fill")
+                        .foregroundColor(.red.opacity(0.8))
+                        .font(.caption)
+                        .padding(.top, 2)
+                    Text(rec)
+                        .font(.caption)
+                        .foregroundColor(.white.opacity(0.8))
+                        .lineLimit(3)
+                }
+            }
+
+            if let bestHours = analysis.best_hours, !bestHours.isEmpty {
+                HStack(alignment: .top, spacing: 8) {
+                    Image(systemName: "clock.fill")
+                        .foregroundColor(.yellow.opacity(0.8))
+                        .font(.caption)
+                        .padding(.top, 2)
+                    Text(bestHours)
+                        .font(.caption)
+                        .foregroundColor(.white.opacity(0.8))
+                        .lineLimit(2)
+                }
+            }
+        }
+        .padding()
+        .background(
+            RoundedRectangle(cornerRadius: 20)
+                .fill(
+                    LinearGradient(
+                        colors: [Color.purple.opacity(0.3), Color.indigo.opacity(0.2)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 20)
+                        .stroke(.white.opacity(0.2), lineWidth: 1)
+                )
+        )
+        .padding(.horizontal)
+    }
+
+    // MARK: - Best Time Card
+
+    private func bestTimeCard(_ bestTime: BestTimeResponse) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Image(systemName: "clock.badge.checkmark")
+                    .foregroundColor(.green)
+                Text("Best Time to Go Out")
+                    .font(.headline.bold())
+                    .foregroundColor(.white)
+            }
+
+            if let best = bestTime.best_window {
+                HStack(spacing: 12) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Best")
+                            .font(.caption)
+                            .foregroundColor(.green.opacity(0.8))
+                        Text(formatTimeWindow(best.start, best.end))
+                            .font(.subheadline.bold())
+                            .foregroundColor(.white)
+                        Text("AQI \(best.avg_aqi)")
+                            .font(.caption)
+                            .foregroundColor(.green)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                    if let worst = bestTime.worst_window {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Avoid")
+                                .font(.caption)
+                                .foregroundColor(.red.opacity(0.8))
+                            Text(formatTimeWindow(worst.start, worst.end))
+                                .font(.subheadline.bold())
+                                .foregroundColor(.white)
+                            Text("AQI \(worst.avg_aqi)")
+                                .font(.caption)
+                                .foregroundColor(.red)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                }
+            }
+
+            // Mini hourly bar chart
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 4) {
+                    ForEach(bestTime.hourly.prefix(12)) { entry in
+                        VStack(spacing: 4) {
+                            RoundedRectangle(cornerRadius: 3)
+                                .fill(Color(hex: entry.color))
+                                .frame(width: 20, height: CGFloat(max(10, entry.aqi / 2)))
+                            Text(entry.hourLabel)
+                                .font(.system(size: 8))
+                                .foregroundColor(.white.opacity(0.6))
+                        }
+                    }
+                }
+            }
+        }
+        .padding()
+        .background(
+            RoundedRectangle(cornerRadius: 20)
+                .fill(
+                    LinearGradient(
+                        colors: [Color.green.opacity(0.2), Color.teal.opacity(0.2)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 20)
+                        .stroke(.white.opacity(0.2), lineWidth: 1)
+                )
+        )
+        .padding(.horizontal)
+    }
+
+    private func formatTimeWindow(_ start: String, _ end: String) -> String {
+        let extractHour = { (s: String) -> String in
+            if let tIndex = s.firstIndex(of: "T") {
+                return String(s[s.index(after: tIndex)...].prefix(5))
+            }
+            return s
+        }
+        return "\(extractHour(start)) - \(extractHour(end))"
+    }
+
+    // MARK: - Weather Card
 
     private var weatherCard: some View {
         VStack(spacing: 16) {

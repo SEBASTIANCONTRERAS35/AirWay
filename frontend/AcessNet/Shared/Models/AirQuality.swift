@@ -116,3 +116,144 @@ extension AirQualityData {
         lastUpdate: Date().addingTimeInterval(-360)
     )
 }
+
+// MARK: - Backend Analysis Response Models
+
+struct AnalysisResponse: Codable {
+    let location: LocationData
+    let timestamp: String
+    let combined_aqi: Int
+    let aqi_range: AQIRange?
+    let category: String
+    let color: String
+    let confidence: Double
+    let dominant_pollutant: String?
+    let station_count: Int
+    let pollutants: PollutantsData?
+    let ml_prediction: MLPredictionResponse?
+    let ai_analysis: AIAnalysisResponse?
+}
+
+struct LocationData: Codable {
+    let lat: Double
+    let lon: Double
+    let elevation_m: Double?
+}
+
+struct AQIRange: Codable {
+    let low: Int
+    let high: Int
+    let spread: Int
+}
+
+struct PollutantsData: Codable {
+    let pm25: PollutantEntry?
+    let pm10: PollutantEntry?
+    let no2: PollutantEntry?
+    let o3: PollutantEntry?
+    let so2: PollutantEntry?
+    let co: PollutantEntry?
+}
+
+struct PollutantEntry: Codable {
+    let value: Double?
+    let unit: String?
+    let sources_reporting: Int?
+}
+
+// MARK: - ML Prediction Models
+
+struct MLPredictionResponse: Codable {
+    let predictions: [String: HorizonPrediction]?
+    let trend: String?
+    let current_pm25: Double?
+    let current_aqi: Int?
+    let model_available: Bool?
+}
+
+struct HorizonPrediction: Codable {
+    let pm25: Double
+    let aqi: Int
+    let risk_level: String
+    let confidence_interval: ConfidenceInterval?
+    let category: String?
+    let color: String?
+}
+
+struct ConfidenceInterval: Codable {
+    let lower_pm25: Double
+    let upper_pm25: Double
+    let lower_aqi: Int
+    let upper_aqi: Int
+}
+
+// MARK: - AI Analysis Models
+
+struct AIAnalysisResponse: Codable {
+    let summary: String?
+    let health_recommendation: String?
+    let source_agreement: String?
+    let alerts: [String]?
+    let best_hours: String?
+    let risk_level: String?
+}
+
+// MARK: - Best Time Response
+
+struct BestTimeResponse: Codable {
+    let location: LocationCoord
+    let mode: String
+    let hours_analyzed: Int
+    let best_window: TimeWindow?
+    let worst_window: TimeWindow?
+    let summary: String
+    let hourly: [HourlyEntry]
+}
+
+struct LocationCoord: Codable {
+    let lat: Double
+    let lon: Double
+}
+
+struct TimeWindow: Codable {
+    let start: String
+    let end: String
+    let avg_aqi: Int
+    let risk_level: String
+}
+
+struct HourlyEntry: Codable, Identifiable {
+    var id: String { time }
+    let time: String
+    let aqi: Int
+    let category: String
+    let color: String
+    let recommendation: String
+
+    var hourLabel: String {
+        if let tIndex = time.firstIndex(of: "T") {
+            let hourStr = time[time.index(after: tIndex)...]
+            return String(hourStr.prefix(5))
+        }
+        return time
+    }
+}
+
+// MARK: - Heatmap Response
+
+struct HeatmapResponse: Codable {
+    let center: LocationCoord
+    let radius_km: Double
+    let grid_points: Int
+    let trend_factor: Double
+    let grid: [HeatmapPoint]
+}
+
+struct HeatmapPoint: Codable, Identifiable {
+    var id: String { "\(lat),\(lon)" }
+    let lat: Double
+    let lon: Double
+    let aqi: Int
+    let predicted_1h: Int
+    let color: String
+}

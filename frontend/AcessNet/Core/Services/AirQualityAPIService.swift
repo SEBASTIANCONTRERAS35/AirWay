@@ -18,13 +18,9 @@ class AirQualityAPIService {
     /// Instancia singleton
     static let shared = AirQualityAPIService()
 
-    /// Base URL del backend Django
+    /// Base URL del backend Django (Render)
     private var baseURL: String {
-        #if DEBUG
-        return "http://localhost:8000/api/v1"  // Local development
-        #else
-        return "https://your-backend.com/api/v1"  // Production
-        #endif
+        return "https://airway-api.onrender.com/api/v1"
     }
 
     /// URLSession para requests
@@ -120,7 +116,6 @@ class AirQualityAPIService {
             print("   AQI: \(Int(backendResponse.aqi))")
             print("   Categoría: \(backendResponse.category)")
             print("   Color: \(backendResponse.color)")
-            print("   Mensaje: \(backendResponse.message)")
             print("   PM2.5: \(backendResponse.pollutants.pm25 ?? 0)")
             print("   O3: \(backendResponse.pollutants.o3 ?? 0)")
             print("   NO2: \(backendResponse.pollutants.no2 ?? 0)")
@@ -234,6 +229,63 @@ class AirQualityAPIService {
         print("✅ Batch completado: \(response.points.count) puntos, \(response.totalProcessingTimeMs)ms")
 
         return response.points
+    }
+
+    // MARK: - New Backend Endpoints (ML Prediction)
+
+    /// Obtiene análisis completo con predicción ML + Gemini
+    func fetchAnalysis(
+        latitude: Double,
+        longitude: Double,
+        mode: String = "walk"
+    ) async throws -> AnalysisResponse {
+        print("\n🧠 ===== ANALYSIS + ML PREDICTION =====")
+        return try await get(
+            endpoint: "/air/analysis",
+            queryParams: [
+                "lat": String(latitude),
+                "lon": String(longitude),
+                "mode": mode,
+            ]
+        )
+    }
+
+    /// Obtiene mejor hora para salir
+    func fetchBestTime(
+        latitude: Double,
+        longitude: Double,
+        mode: String = "walk",
+        hours: Int = 12
+    ) async throws -> BestTimeResponse {
+        print("\n⏰ ===== BEST TIME REQUEST =====")
+        return try await get(
+            endpoint: "/air/best-time",
+            queryParams: [
+                "lat": String(latitude),
+                "lon": String(longitude),
+                "mode": mode,
+                "hours": String(hours),
+            ]
+        )
+    }
+
+    /// Obtiene mapa de calor AQI
+    func fetchHeatmap(
+        latitude: Double,
+        longitude: Double,
+        radiusKm: Double = 5,
+        resolution: Int = 10
+    ) async throws -> HeatmapResponse {
+        print("\n🗺️ ===== HEATMAP REQUEST =====")
+        return try await get(
+            endpoint: "/air/heatmap",
+            queryParams: [
+                "lat": String(latitude),
+                "lon": String(longitude),
+                "radius_km": String(radiusKm),
+                "resolution": String(resolution),
+            ]
+        )
     }
 
     // MARK: - Private HTTP Methods
@@ -376,7 +428,6 @@ struct DjangoAQIResponse: Codable {
     let aqi: Double
     let category: String
     let color: String
-    let message: String
     let pollutants: DjangoPollutants
 }
 

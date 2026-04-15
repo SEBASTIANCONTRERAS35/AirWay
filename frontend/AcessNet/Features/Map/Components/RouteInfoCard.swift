@@ -111,6 +111,30 @@ struct RouteInfoCard: View {
             }
             .padding(.vertical, 8)
 
+            // Air Quality prediction badge (if available from backend)
+            if let scored = scoredRoute, scored.averageAQI > 0 {
+                Divider()
+                HStack(spacing: 16) {
+                    EnhancedInfoBadge(
+                        icon: "aqi.medium",
+                        value: "\(Int(scored.averageAQI))",
+                        label: "AQI Now",
+                        color: scored.averageAQI <= 50 ? .green : scored.averageAQI <= 100 ? .yellow : .orange
+                    )
+
+                    Divider()
+                        .frame(height: 35)
+
+                    EnhancedInfoBadge(
+                        icon: "brain.head.profile",
+                        value: "\(Int(scored.predictedArrivalAQI ?? scored.averageAQI))",
+                        label: "AQI Arrival",
+                        color: (scored.predictedArrivalAQI ?? scored.averageAQI) <= 50 ? .green : (scored.predictedArrivalAQI ?? scored.averageAQI) <= 100 ? .yellow : .orange
+                    )
+                }
+                .padding(.vertical, 4)
+            }
+
             // Información de seguridad (si está disponible)
             if let scored = scoredRoute, let incidentAnalysis = scored.incidentAnalysis {
                 VStack(spacing: 12) {

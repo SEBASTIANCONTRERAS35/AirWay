@@ -98,6 +98,11 @@ struct ScoredRoute: Identifiable {
         return airQualityAnalysis?.averageAQI ?? 0
     }
 
+    /// AQI predicho al llegar (ML prediction)
+    var predictedArrivalAQI: Double? {
+        return nil // TODO: Populate from backend /routes/optimal response
+    }
+
     /// PM2.5 promedio
     var averagePM25: Double {
         return airQualityAnalysis?.averagePM25 ?? 0
