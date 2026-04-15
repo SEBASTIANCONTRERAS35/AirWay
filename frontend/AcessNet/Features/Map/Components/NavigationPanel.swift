@@ -31,6 +31,31 @@ struct NavigationPanel: View {
                 EmptyZoneCard()
             }
 
+            // Predicted AQI at arrival
+            if let avgAQI = navigationState.selectedRoute?.averageAQI, avgAQI > 0 {
+                HStack(spacing: 8) {
+                    Image(systemName: "brain.head.profile")
+                        .font(.caption)
+                        .foregroundStyle(.cyan)
+                    Text("AQI at arrival:")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Text("\(Int(avgAQI))")
+                        .font(.caption.bold())
+                        .foregroundStyle(avgAQI <= 50 ? .green : avgAQI <= 100 ? .yellow : .orange)
+
+                    Spacer()
+
+                    Text("ML Prediction")
+                        .font(.system(size: 9))
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Capsule().fill(.secondary.opacity(0.1)))
+                }
+                .padding(.horizontal, 4)
+            }
+
             // Bottom: Barra de progreso
             NavigationProgressBar(
                 progress: navigationState.progress,

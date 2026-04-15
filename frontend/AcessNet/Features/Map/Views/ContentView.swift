@@ -310,6 +310,22 @@ struct EnhancedMapView: View {
                 .transition(.opacity)
             }
 
+            // ML Prediction Banner (below search, above map)
+            if !hasActiveRoute && !isSearchFocused && !showLocationInfo {
+                VStack {
+                    Spacer()
+                        .frame(height: AppConstants.safeAreaTop + 70)
+                    HStack {
+                        Spacer()
+                        AQIPredictionBanner()
+                        Spacer()
+                    }
+                    Spacer()
+                }
+                .transition(.opacity)
+                .allowsHitTesting(false)
+            }
+
             // Botón X para cancelar navegación o limpiar ruta (top left)
             if isInNavigationMode || hasActiveRoute {
                 VStack {

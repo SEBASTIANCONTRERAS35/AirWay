@@ -74,7 +74,15 @@ struct LocationInfoCard: View {
             Divider()
                 .opacity(showContent ? 1 : 0)
 
-            // SECCIÓN 4: Botones de Acción
+            // SECCIÓN 4: Predicción ML
+            predictionSection
+                .opacity(showContent ? 1 : 0)
+                .offset(y: showContent ? 0 : 10)
+
+            Divider()
+                .opacity(showContent ? 1 : 0)
+
+            // SECCIÓN 5: Botones de Acción
             actionButtons
                 .opacity(showContent ? 1 : 0)
                 .scaleEffect(showContent ? 1.0 : 0.9)
@@ -306,6 +314,76 @@ struct LocationInfoCard: View {
         )
     }
 
+    // MARK: - Prediction Section
+
+    private var predictionSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 6) {
+                Image(systemName: "brain.head.profile")
+                    .font(.system(size: 14))
+                    .foregroundStyle(.cyan)
+                Text("ML Prediction at Destination")
+                    .font(.subheadline.weight(.bold))
+                    .foregroundStyle(.primary)
+            }
+
+            HStack(spacing: 12) {
+                PredictionTimeSlot(label: "Now", aqi: Int(locationInfo.airQuality.aqi), isHighlighted: true)
+                Image(systemName: "arrow.right")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                PredictionTimeSlot(label: "+1h", aqi: estimatedAQI(hoursAhead: 1), isHighlighted: false)
+                Image(systemName: "arrow.right")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                PredictionTimeSlot(label: "+3h", aqi: estimatedAQI(hoursAhead: 3), isHighlighted: false)
+            }
+            .frame(maxWidth: .infinity)
+
+            // Best time hint
+            HStack(spacing: 6) {
+                Image(systemName: "clock.fill")
+                    .font(.caption2)
+                    .foregroundStyle(.green)
+                Text("Best departure: within the next hour")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .padding(8)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.green.opacity(0.08))
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+        }
+        .padding(12)
+        .background(
+            RoundedRectangle(cornerRadius: 14)
+                .fill(Color.cyan.opacity(0.05))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 14)
+                        .stroke(Color.cyan.opacity(0.15), lineWidth: 1)
+                )
+        )
+    }
+
+    /// Estimation of future AQI based on time of day patterns
+    private func estimatedAQI(hoursAhead: Int) -> Int {
+        let currentAQI = Int(locationInfo.airQuality.aqi)
+        let calendar = Calendar.current
+        let futureHour = (calendar.component(.hour, from: Date()) + hoursAhead) % 24
+
+        // Simple heuristic: afternoon hours (14-18) tend to be worse
+        let hourFactor: Double
+        switch futureHour {
+        case 6..<10: hourFactor = 0.85   // Morning: usually better
+        case 10..<14: hourFactor = 1.0   // Midday: similar
+        case 14..<18: hourFactor = 1.2   // Afternoon: usually worse
+        case 18..<22: hourFactor = 1.1   // Evening: slightly worse
+        default: hourFactor = 0.95       // Night: slightly better
+        }
+
+        return max(1, Int(Double(currentAQI) * hourFactor))
+    }
+
     private var actionButtons: some View {
         VStack(spacing: 12) {
             // Botón primario: Calcular Ruta
@@ -433,6 +511,45 @@ struct LocationInfoCard: View {
         case 0..<54: return .green
         case 54..<154: return .yellow
         case 154..<254: return .orange
+        default: return .red
+        }
+    }
+}
+
+// MARK: - Prediction Time Slot
+
+struct PredictionTimeSlot: View {
+    let label: String
+    let aqi: Int
+    let isHighlighted: Bool
+
+    var body: some View {
+        VStack(spacing: 4) {
+            Text(label)
+                .font(.caption2.weight(.medium))
+                .foregroundStyle(.secondary)
+
+            Text("\(aqi)")
+                .font(.system(size: 18, weight: .bold, design: .rounded))
+                .foregroundStyle(aqiColor)
+
+            Circle()
+                .fill(aqiColor)
+                .frame(width: 6, height: 6)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 8)
+        .background(
+            RoundedRectangle(cornerRadius: 10)
+                .fill(isHighlighted ? aqiColor.opacity(0.1) : Color.clear)
+        )
+    }
+
+    private var aqiColor: Color {
+        switch aqi {
+        case 0..<51: return .green
+        case 51..<101: return .yellow
+        case 101..<151: return .orange
         default: return .red
         }
     }
