@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>NSCameraUsageDescription</key>
+	<string>AcessNet uses the camera to visualize air quality particles in augmented reality, helping you see invisible PM2.5 pollution in your surroundings.</string>
+	<key>UIAppFonts</key>
+	<array>
+		<string>HarmonyOS_Sans_Black_Italic.ttf</string>
+		<string>HarmonyOS_Sans_Black_Italic.ttf</string>
+		<string>HarmonyOS_Sans_Bold.ttf</string>
+		<string>HarmonyOS_Sans_Bold_Italic.ttf</string>
+		<string>HarmonyOS_Sans_Light.ttf</string>
+		<string>HarmonyOS_Sans_Light_Italic.ttf</string>
+		<string>HarmonyOS_Sans_Medium.ttf</string>
+		<string>HarmonyOS_Sans_Medium_Italic.ttf</string>
+		<string>HarmonyOS_Sans_Regular.ttf</string>
+		<string>HarmonyOS_Sans_Regular_Italic.ttf</string>
+		<string>HarmonyOS_Sans_Thin.ttf</string>
+		<string>HarmonyOS_Sans_Thin_Italic.ttf</string>
+	</array>
+</dict>
+</plist>
