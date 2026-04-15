@@ -18,11 +18,26 @@ from django.core.cache import cache
 
 logger = logging.getLogger(__name__)
 
-# Directorio de modelos (backend-api/models/)
-MODEL_DIR = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))),
-    "models",
-)
+# Directorio de modelos — busca en múltiples rutas posibles
+def _find_model_dir():
+    """Encuentra el directorio de modelos probando varias rutas."""
+    candidates = [
+        # Desde Django settings.BASE_DIR.parent / models
+        os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))), "models"),
+        # Desde CWD
+        os.path.join(os.getcwd(), "models"),
+        # Relativo al proyecto
+        os.path.join(os.getcwd(), "..", "models"),
+        # Absoluto común en Render
+        "/opt/render/project/src/models",
+    ]
+    for path in candidates:
+        marker = os.path.join(path, "feature_names.json")
+        if os.path.exists(marker):
+            return path
+    return candidates[0]  # Default al primero
+
+MODEL_DIR = _find_model_dir()
 
 # Breakpoints EPA para conversión PM2.5 → AQI
 AQI_BREAKPOINTS = [
@@ -84,6 +99,11 @@ class PredictionService:
 
     def _load_models(self):
         """Carga modelos y metadata desde disco."""
+        logger.info(f"PredictionService: MODEL_DIR={MODEL_DIR}")
+        logger.info(f"PredictionService: MODEL_DIR exists={os.path.exists(MODEL_DIR)}")
+        if os.path.exists(MODEL_DIR):
+            logger.info(f"PredictionService: contents={os.listdir(MODEL_DIR)}")
+
         try:
             import joblib
         except ImportError:
