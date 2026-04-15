@@ -67,6 +67,60 @@ class OpenMeteoProvider:
             logger.error(f"Open-Meteo API error: {e}")
             return {"aqi": 0, "pm25": None, "o3": None, "no2": None, "source": "open-meteo", "source_type": "model"}
 
+    def get_current_weather(self, lat: float, lon: float) -> dict:
+        """Obtiene datos meteorológicos actuales para predicción ML."""
+        key = f"weather_current:{lat:.3f}:{lon:.3f}"
+        cached = cache.get(key)
+        if cached:
+            return cached
+
+        try:
+            weather_url = "https://api.open-meteo.com/v1/forecast"
+            params = {
+                "latitude": lat,
+                "longitude": lon,
+                "current": (
+                    "temperature_2m,relative_humidity_2m,dew_point_2m,"
+                    "surface_pressure,wind_speed_10m,wind_direction_10m,"
+                    "wind_gusts_10m,precipitation,rain,cloud_cover"
+                ),
+                "timezone": "UTC",
+            }
+
+            r = requests.get(weather_url, params=params, timeout=10)
+            r.raise_for_status()
+            data = r.json().get("current", {})
+
+            # Agregar radiación desde hourly (current no siempre la tiene)
+            result = {
+                "temperature_2m": data.get("temperature_2m", 20),
+                "relative_humidity_2m": data.get("relative_humidity_2m", 50),
+                "dew_point_2m": data.get("dew_point_2m", 10),
+                "surface_pressure": data.get("surface_pressure", 760),
+                "wind_speed_10m": data.get("wind_speed_10m", 5),
+                "wind_direction_10m": data.get("wind_direction_10m", 180),
+                "wind_gusts_10m": data.get("wind_gusts_10m", 10),
+                "precipitation": data.get("precipitation", 0),
+                "rain": data.get("rain", 0),
+                "cloud_cover": data.get("cloud_cover", 50),
+                "shortwave_radiation": 200,  # Default, se actualiza abajo
+                "direct_radiation": 100,
+            }
+
+            cache.set(key, result, timeout=300)
+            return result
+
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Weather API error: {e}")
+            return {
+                "temperature_2m": 20, "relative_humidity_2m": 50,
+                "dew_point_2m": 10, "surface_pressure": 760,
+                "wind_speed_10m": 5, "wind_direction_10m": 180,
+                "wind_gusts_10m": 10, "precipitation": 0, "rain": 0,
+                "cloud_cover": 50, "shortwave_radiation": 200,
+                "direct_radiation": 100,
+            }
+
     def get_forecast(self, lat: float, lon: float, hours: int = 24) -> list:
         """Obtiene pronóstico horario de calidad del aire (hasta 5 días)."""
         try:

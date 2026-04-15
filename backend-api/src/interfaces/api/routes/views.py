@@ -9,6 +9,7 @@ from adapters.air.openaq_grid_provider import OpenAQGridProvider
 from adapters.air.openmeteo_provider import OpenMeteoProvider
 from application.routes.exposure import ExposureService
 from application.air.aggregator import AirQualityAggregator
+from application.air.prediction_service import PredictionService
 from adapters.ai.llm_service import LLMService
 
 
@@ -106,15 +107,29 @@ class AirAnalysisView(APIView):
             aggregator = AirQualityAggregator()
             combined = aggregator.get_combined(lat, lon)
 
-            # Paso 2: Obtener pronóstico de Open-Meteo
+            # Paso 2: Obtener pronóstico y weather actual de Open-Meteo
             meteo = OpenMeteoProvider()
             forecast = meteo.get_forecast(lat, lon, hours=24)
+            weather = meteo.get_current_weather(lat, lon)
 
-            # Paso 3: Análisis con IA
+            # Paso 3: Predicción ML (PM2.5 futuro)
+            ml_prediction = None
+            try:
+                predictor = PredictionService()
+                if predictor.is_available:
+                    ml_prediction = predictor.predict(combined, weather, lat, lon)
+            except Exception as e:
+                import logging
+                logging.getLogger(__name__).warning(f"ML prediction error: {e}")
+
+            # Paso 4: Análisis con IA (ahora incluye predicción ML)
             llm = LLMService()
-            ai_analysis = llm.analyze(combined, mode=mode, forecast=forecast)
+            ai_analysis = llm.analyze(
+                combined, mode=mode, forecast=forecast,
+                ml_prediction=ml_prediction,
+            )
 
-            # Paso 4: Categoría AQI
+            # Paso 5: Categoría AQI
             aqi = combined.get("combined_aqi", 0)
             category, color = _aqi_category(aqi)
 
@@ -135,6 +150,7 @@ class AirAnalysisView(APIView):
                 "station_count": combined.get("station_count", 0),
                 "stations": combined.get("stations", []),
                 "pollutants": combined.get("pollutants", {}),
+                "ml_prediction": ml_prediction,
                 "ai_analysis": ai_analysis,
                 "forecast": forecast[:12],
             })
@@ -142,6 +158,78 @@ class AirAnalysisView(APIView):
         except Exception as e:
             return Response(
                 {"error": f"Error en análisis de calidad del aire: {str(e)}"},
+                status=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+
+class AirPredictionView(APIView):
+    """
+    Predicción de calidad del aire con ML.
+    GET /api/v1/air/prediction?lat=19.4326&lon=-99.1332&mode=bike
+    """
+    def get(self, request):
+        try:
+            lat = float(request.query_params.get("lat"))
+            lon = float(request.query_params.get("lon"))
+        except (TypeError, ValueError):
+            return Response(
+                {"error": "Parámetros inválidos. Usa 'lat' y 'lon'."},
+                status=http_status.HTTP_400_BAD_REQUEST,
+            )
+
+        mode = request.query_params.get("mode", "walk")
+
+        try:
+            # Datos actuales
+            aggregator = AirQualityAggregator()
+            combined = aggregator.get_combined(lat, lon)
+
+            # Weather actual
+            meteo = OpenMeteoProvider()
+            weather = meteo.get_current_weather(lat, lon)
+
+            # Predicción ML
+            predictor = PredictionService()
+            if not predictor.is_available:
+                return Response({
+                    "error": "Modelo de predicción no disponible",
+                    "current_aqi": combined.get("combined_aqi", 0),
+                }, status=http_status.HTTP_503_SERVICE_UNAVAILABLE)
+
+            prediction = predictor.predict(combined, weather, lat, lon)
+
+            # Categorías para cada horizonte
+            for key, pred in prediction.get("predictions", {}).items():
+                cat, color = _aqi_category(pred["aqi"])
+                pred["category"] = cat
+                pred["color"] = color
+
+            # Análisis IA de la predicción
+            llm = LLMService()
+            ai_analysis = llm.analyze(
+                combined, mode=mode, ml_prediction=prediction,
+            )
+
+            current_aqi = combined.get("combined_aqi", 0)
+            current_cat, current_color = _aqi_category(current_aqi)
+
+            return Response({
+                "location": {"lat": lat, "lon": lon},
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "current": {
+                    "aqi": current_aqi,
+                    "category": current_cat,
+                    "color": current_color,
+                    "pm25": prediction.get("current_pm25"),
+                },
+                "prediction": prediction,
+                "mode": mode,
+                "ai_analysis": ai_analysis,
+            })
+
+        except Exception as e:
+            return Response(
+                {"error": f"Error en predicción: {str(e)}"},
                 status=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 

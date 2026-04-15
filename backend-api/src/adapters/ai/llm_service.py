@@ -61,7 +61,9 @@ class LLMService:
         self.gemini_model = os.environ.get("GEMINI_MODEL", "gemini-2.0-flash-lite")
         self.cache_ttl = 300  # 5 min
 
-    def analyze(self, aggregated_data: dict, mode: str = "walk", forecast: list = None) -> dict:
+    def analyze(self, aggregated_data: dict, mode: str = "walk",
+                forecast: list = None, biometric_context: dict = None,
+                ml_prediction: dict = None) -> dict:
         """
         Analiza datos combinados de calidad del aire con IA.
 
@@ -69,6 +71,8 @@ class LLMService:
             aggregated_data: Resultado del AirQualityAggregator
             mode: Modo de transporte (walk/run/bike)
             forecast: Pronóstico horario de Open-Meteo (opcional)
+            biometric_context: Contexto PPI del usuario (opcional)
+            ml_prediction: Predicción ML de PM2.5 futuro (opcional)
 
         Returns:
             Análisis estructurado del LLM
@@ -84,7 +88,7 @@ class LLMService:
             return cached
 
         # Construir el prompt con los datos
-        user_prompt = self._build_prompt(aggregated_data, mode, forecast)
+        user_prompt = self._build_prompt(aggregated_data, mode, forecast, biometric_context, ml_prediction)
 
         # Llamar al LLM según el proveedor configurado
         try:
@@ -104,8 +108,9 @@ class LLMService:
             logger.error(f"LLM error: {e}")
             return self._local_analysis(aggregated_data, mode)
 
-    def _build_prompt(self, data: dict, mode: str, forecast: list = None) -> str:
-        """Construye el prompt enriquecido con estaciones, altitud y outliers."""
+    def _build_prompt(self, data: dict, mode: str, forecast: list = None,
+                      biometric_context: dict = None, ml_prediction: dict = None) -> str:
+        """Construye el prompt enriquecido con estaciones, altitud, outliers, biométricos y predicción ML."""
         mode_label = MODE_LABELS.get(mode, mode)
         loc = data.get("location", {})
         user_elev = data.get("user_elevation_m", 0)
@@ -191,10 +196,55 @@ MODO DE TRANSPORTE: {mode_label}
 INSTRUCCIONES ADICIONALES:
 - Si hay gran spread (>50 puntos), explica POR QUÉ (altitud, distancia, microclimas)
 - Si hay outliers, explica por qué esa estación difiere
-- Recomienda las mejores horas basándote en el pronóstico
+- Recomienda las mejores horas basándote en el pronóstico y la predicción ML
 - Adapta la recomendación al modo de transporte y la altitud del usuario
+- Si hay predicción ML, incluye tendencia y recomendación temporal
 
 Genera el análisis en formato JSON."""
+
+        # ── Predicción ML ──
+        if ml_prediction and ml_prediction.get("model_available"):
+            preds = ml_prediction.get("predictions", {})
+            trend = ml_prediction.get("trend", "desconocido")
+            ml_section = f"\n\nPREDICCIÓN ML (modelo GradientBoosting entrenado con datos CDMX):"
+            ml_section += f"\n  Tendencia: {trend}"
+            for h_key in ["1h", "3h", "6h"]:
+                p = preds.get(h_key, {})
+                if p:
+                    ci = p.get("confidence_interval", {})
+                    ml_section += (
+                        f"\n  En {h_key}: PM2.5={p.get('pm25', '?')} µg/m³"
+                        f" (AQI={p.get('aqi', '?')}, {p.get('risk_level', '?')})"
+                        f" [IC95: {ci.get('lower_pm25', '?')}-{ci.get('upper_pm25', '?')}]"
+                    )
+            ml_section += "\n  IMPORTANTE: Usa esta predicción para recomendar el mejor momento para salir."
+            prompt += ml_section
+
+        # Add biometric context if available (PPI integration)
+        if biometric_context:
+            bio_section = "\n\n📊 DATOS BIOMÉTRICOS DEL USUARIO (de Apple Watch):"
+            if biometric_context.get("heart_rate"):
+                hr = biometric_context["heart_rate"]
+                hr_base = biometric_context.get("heart_rate_baseline", "desconocido")
+                bio_section += f"\n- Frecuencia cardíaca: {hr} bpm (baseline personal: {hr_base} bpm)"
+            if biometric_context.get("hrv"):
+                hrv = biometric_context["hrv"]
+                hrv_base = biometric_context.get("hrv_baseline", "desconocido")
+                bio_section += f"\n- HRV (SDNN): {hrv} ms (baseline: {hrv_base} ms)"
+            if biometric_context.get("spo2"):
+                spo2 = biometric_context["spo2"]
+                spo2_base = biometric_context.get("spo2_baseline", "desconocido")
+                bio_section += f"\n- SpO2: {spo2}% (baseline: {spo2_base}%)"
+            if biometric_context.get("ppi_score") is not None:
+                ppi = biometric_context["ppi_score"]
+                zone = biometric_context.get("ppi_zone", "desconocido")
+                bio_section += f"\n- PPI Score: {ppi}/100 (zona: {zone})"
+            bio_section += (
+                "\n\nSi los biométricos muestran desviaciones significativas de la baseline, "
+                "menciona que el cuerpo del usuario está respondiendo activamente a la "
+                "contaminación actual. Adapta las recomendaciones en consecuencia."
+            )
+            prompt += bio_section
 
         return prompt
 
