@@ -18,9 +18,9 @@ from django.core.cache import cache
 
 logger = logging.getLogger(__name__)
 
-# Directorio de modelos
+# Directorio de modelos (backend-api/models/)
 MODEL_DIR = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))),
     "models",
 )
 
