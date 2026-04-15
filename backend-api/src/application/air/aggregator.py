@@ -1,208 +1,422 @@
 # application/air/aggregator.py
 """
-Agregador multi-fuente de calidad del aire.
+Agregador multi-fuente de calidad del aire con IDW.
 Consulta OpenAQ, Open-Meteo y WAQI en paralelo,
-pondera por confianza y devuelve un resultado combinado.
+obtiene MÚLTIPLES estaciones por fuente, y aplica
+Inverse Distance Weighting para interpolar el AQI
+en el punto exacto del usuario.
 """
 import logging
+from math import radians, sin, cos, atan2, sqrt
 from datetime import datetime, timezone
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from adapters.air.openaq_grid_provider import OpenAQGridProvider
 from adapters.air.openmeteo_provider import OpenMeteoProvider
 from adapters.air.waqi_provider import WAQIProvider
+from adapters.air.elevation_service import ElevationService
 
 logger = logging.getLogger(__name__)
 
-# Pesos de confianza por tipo de fuente
-# Estaciones reales > modelos atmosféricos
-WEIGHTS = {
-    "openaq": 0.45,     # Estación real, red abierta
-    "waqi": 0.35,       # Estación real, red global
-    "open-meteo": 0.20, # Modelo atmosférico (CAMS)
-}
+# Radio por defecto para buscar estaciones (metros)
+DEFAULT_RADIUS_KM = 10
+
+
+def _haversine_m(lat1, lon1, lat2, lon2):
+    """Distancia en metros entre dos puntos."""
+    R = 6371000
+    dlat = radians(lat2 - lat1)
+    dlon = radians(lon2 - lon1)
+    a = sin(dlat / 2) ** 2 + cos(radians(lat1)) * cos(radians(lat2)) * sin(dlon / 2) ** 2
+    return 2 * R * atan2(sqrt(a), sqrt(1 - a))
 
 
 class AirQualityAggregator:
     """
-    Consulta múltiples fuentes de calidad del aire en paralelo
-    y devuelve un resultado combinado con nivel de confianza.
+    Agrega datos de múltiples fuentes y estaciones usando IDW.
     """
 
     def __init__(self):
-        self.providers = {
-            "openaq": OpenAQGridProvider(),
-            "open-meteo": OpenMeteoProvider(),
-            "waqi": WAQIProvider(),
-        }
+        self.openaq = OpenAQGridProvider()
+        self.openmeteo = OpenMeteoProvider()
+        self.waqi = WAQIProvider()
+        self.elevation = ElevationService()
 
     def get_combined(self, lat: float, lon: float, when: datetime = None) -> dict:
         """
-        Consulta todas las fuentes en paralelo y devuelve resultado combinado.
-
-        Retorna:
-        {
-            "combined_aqi": int,
-            "confidence": float (0-1),
-            "sources": { nombre: {data, status, weight} },
-            "pollutants": { pm25, no2, o3, ... },
-            "dominant_pollutant": str,
-            "source_count": int,
-        }
+        1. Obtiene estaciones cercanas de WAQI y OpenAQ en paralelo
+        2. Obtiene dato de modelo de Open-Meteo
+        3. Deduplica estaciones por proximidad
+        4. Aplica IDW para interpolar AQI en el punto del usuario
+        5. Calcula confianza, rango, y metadata
         """
         when = when or datetime.now(timezone.utc)
-        results = {}
 
-        # Consultar todas las fuentes en paralelo
+        # --- Paso 1: Obtener datos de todas las fuentes en paralelo ---
+        waqi_stations = []
+        openaq_stations = []
+        meteo_data = None
+
         with ThreadPoolExecutor(max_workers=3) as executor:
-            futures = {
-                executor.submit(self._safe_fetch, name, provider, lat, lon, when): name
-                for name, provider in self.providers.items()
-            }
+            f_waqi = executor.submit(self._safe_call, self.waqi.get_stations_nearby, lat, lon, DEFAULT_RADIUS_KM)
+            f_openaq = executor.submit(self._safe_call, self.openaq.get_stations_nearby, lat, lon, DEFAULT_RADIUS_KM * 1000)
+            f_meteo = executor.submit(self._safe_call, self.openmeteo.get_aqi_cell, lat, lon, when)
 
-            for future in as_completed(futures):
-                name = futures[future]
-                try:
-                    data = future.result()
-                    if data and data.get("aqi", 0) > 0:
-                        results[name] = data
-                        logger.info(f"[{name}] AQI={data['aqi']}")
-                    else:
-                        logger.warning(f"[{name}] sin datos válidos")
-                except Exception as e:
-                    logger.error(f"[{name}] error: {e}")
+            waqi_stations = f_waqi.result() or []
+            openaq_stations = f_openaq.result() or []
+            meteo_data = f_meteo.result()
 
-        if not results:
-            logger.error("Ninguna fuente devolvió datos")
+        # --- Paso 2: Unificar todas las estaciones ---
+        all_stations = []
+        for s in waqi_stations:
+            all_stations.append(s)
+        for s in openaq_stations:
+            all_stations.append(s)
+
+        # --- Paso 3: Deduplicar por proximidad (<500m = misma estación) ---
+        all_stations = self._deduplicate(all_stations)
+
+        # --- Paso 4: Agregar Open-Meteo como estación virtual ---
+        if meteo_data and meteo_data.get("aqi", 0) > 0:
+            all_stations.append({
+                "aqi": meteo_data["aqi"],
+                "lat": lat,
+                "lon": lon,
+                "name": "Open-Meteo CAMS (modelo)",
+                "distance_m": 0,
+                "source": "open-meteo",
+                "source_type": "model",
+                "pm25": meteo_data.get("pm25"),
+                "pm10": meteo_data.get("pm10"),
+                "no2": meteo_data.get("no2"),
+                "o3": meteo_data.get("o3"),
+                "so2": meteo_data.get("so2"),
+                "co": meteo_data.get("co"),
+            })
+
+        if not all_stations:
             return self._empty_result(lat, lon)
 
-        return self._aggregate(results, lat, lon)
-
-    def _safe_fetch(self, name: str, provider, lat: float, lon: float, when: datetime) -> dict:
-        """Envuelve la llamada al proveedor con manejo de errores."""
+        # --- Paso 5: Enriquecer con altitud ---
+        user_elevation = 0.0
         try:
-            return provider.get_aqi_cell(lat, lon, when)
+            user_elevation, all_stations = self.elevation.enrich_stations_with_elevation(
+                all_stations, lat, lon
+            )
+            # Calcular factor altitudinal para cada estación
+            for s in all_stations:
+                s["altitude_factor"] = self._altitude_weight(
+                    user_elevation, s.get("elevation_m", 0)
+                )
+            logger.info(f"User elevation: {user_elevation}m, stations enriched")
         except Exception as e:
-            logger.error(f"[{name}] fetch error: {e}")
-            return None
+            logger.warning(f"Elevation enrichment failed, continuing without: {e}")
+            for s in all_stations:
+                s["elevation_m"] = 0.0
+                s["altitude_factor"] = 1.0
 
-    def _aggregate(self, results: dict, lat: float, lon: float) -> dict:
-        """Combina resultados ponderados de múltiples fuentes."""
+        # --- Paso 6: Detectar outliers ---
+        self._detect_outliers(all_stations)
 
-        # --- AQI combinado (media ponderada) ---
-        total_weight = 0
-        weighted_aqi = 0
-        source_details = {}
+        # --- Paso 7: IDW con corrección altitudinal + outliers ---
+        idw_aqi = self._idw_interpolate(all_stations, lat, lon)
 
-        for name, data in results.items():
-            w = WEIGHTS.get(name, 0.1)
-            aqi = data.get("aqi", 0)
-            weighted_aqi += aqi * w
-            total_weight += w
+        # --- Paso 8: Rango de confianza ---
+        station_aqis = [s["aqi"] for s in all_stations if s.get("aqi", 0) > 0]
+        aqi_range = {
+            "low": min(station_aqis),
+            "high": max(station_aqis),
+            "spread": max(station_aqis) - min(station_aqis),
+        }
 
-            source_details[name] = {
-                "aqi": aqi,
-                "status": "ok",
-                "weight": w,
-                "source_type": data.get("source_type", "unknown"),
-                "station_name": data.get("station_name"),
-            }
+        # --- Paso 9: Confianza ---
+        confidence = self._calculate_confidence(all_stations, aqi_range)
 
-        combined_aqi = round(weighted_aqi / total_weight) if total_weight > 0 else 0
+        # --- Paso 9: Contaminantes (IDW por contaminante) ---
+        pollutants = self._interpolate_pollutants(all_stations, lat, lon)
 
-        # --- Contaminantes combinados (promedio de fuentes disponibles) ---
-        pollutants = self._combine_pollutants(results)
-
-        # --- Confianza ---
-        confidence = self._calculate_confidence(results)
-
-        # --- Contaminante dominante ---
+        # --- Paso 10: Contaminante dominante ---
         dominant = self._dominant_pollutant(pollutants)
 
+        # --- Paso 11: Fuentes resumidas ---
+        sources = self._summarize_sources(all_stations)
+
         return {
-            "combined_aqi": combined_aqi,
+            "combined_aqi": idw_aqi,
+            "aqi_range": aqi_range,
             "confidence": confidence,
-            "sources": source_details,
+            "sources": sources,
             "pollutants": pollutants,
             "dominant_pollutant": dominant,
-            "source_count": len(results),
+            "source_count": len(sources),
+            "station_count": len(all_stations),
+            "stations": all_stations,
+            "user_elevation_m": round(user_elevation),
             "location": {"lat": lat, "lon": lon},
         }
 
-    def _combine_pollutants(self, results: dict) -> dict:
-        """Promedia los valores de contaminantes de todas las fuentes."""
+    # ── IDW ──────────────────────────────────────────────────
+
+    def _idw_interpolate(self, stations: list, target_lat: float, target_lon: float, power: float = 2) -> int:
+        """
+        Inverse Distance Weighting con corrección altitudinal.
+
+        w_i = (1 / dist_i^p) × altitude_factor × source_factor
+
+        - altitude_factor: reduce peso de estaciones en altitud muy diferente
+        - source_factor: modelos atmosféricos pesan 0.3x vs estaciones reales
+        """
+        numerator = 0.0
+        denominator = 0.0
+
+        for s in stations:
+            aqi = s.get("aqi", 0)
+            if aqi <= 0:
+                continue
+
+            dist = s.get("distance_m", 0)
+            if dist == 0:
+                dist = _haversine_m(target_lat, target_lon, s.get("lat", 0), s.get("lon", 0))
+            dist = max(dist, 100)
+
+            w = 1.0 / (dist ** power)
+
+            # Factor de altitud (Fase 2)
+            w *= s.get("altitude_factor", 1.0)
+
+            # Factor de outlier (Fase 3) — no eliminar, solo reducir
+            if s.get("is_outlier"):
+                w *= 0.2
+
+            # Factor de tipo de fuente
+            if s.get("source_type") == "model":
+                w *= 0.3
+
+            numerator += aqi * w
+            denominator += w
+
+        if denominator == 0:
+            return 0
+
+        return round(numerator / denominator)
+
+    def _interpolate_pollutants(self, stations: list, lat: float, lon: float) -> dict:
+        """IDW con corrección altitudinal para cada contaminante."""
         pollutant_keys = ["pm25", "pm10", "no2", "o3", "so2", "co"]
-        combined = {}
+        result = {}
 
         for key in pollutant_keys:
-            values = []
-            for data in results.values():
-                v = data.get(key)
-                if v is not None:
-                    values.append(v)
+            numerator = 0.0
+            denominator = 0.0
+            count = 0
 
-            if values:
-                combined[key] = {
-                    "value": round(sum(values) / len(values), 2),
+            for s in stations:
+                val = s.get(key)
+                if val is None:
+                    continue
+
+                dist = max(s.get("distance_m", 100), 100)
+                w = 1.0 / (dist ** 2)
+                w *= s.get("altitude_factor", 1.0)
+                if s.get("is_outlier"):
+                    w *= 0.2
+                if s.get("source_type") == "model":
+                    w *= 0.3
+
+                numerator += val * w
+                denominator += w
+                count += 1
+
+            if denominator > 0:
+                result[key] = {
+                    "value": round(numerator / denominator, 2),
                     "unit": "µg/m³",
-                    "sources_reporting": len(values),
+                    "sources_reporting": count,
                 }
             else:
-                combined[key] = None
+                result[key] = None
 
-        return combined
+        return result
 
-    def _calculate_confidence(self, results: dict) -> float:
+    # ── Corrección altitudinal ─────────────────────────────────
+
+    def _altitude_weight(self, user_elev: float, station_elev: float) -> float:
         """
-        Calcula nivel de confianza (0-1) basado en:
-        - Número de fuentes que respondieron
-        - Concordancia entre ellas (desviación estándar)
-        - Presencia de estaciones reales vs modelos
-        """
-        aqis = [d.get("aqi", 0) for d in results.values() if d.get("aqi", 0) > 0]
+        Reduce peso de estaciones con altitud muy diferente al usuario.
 
-        if not aqis:
+        La capa de inversión térmica en ciudades como CDMX divide
+        la atmósfera en estratos con calidad del aire radicalmente diferente.
+        Una estación por encima de la inversión (~2500m en CDMX) mide
+        aire limpio que no es representativo del valle.
+
+        Factores:
+          ≤50m diff  → 1.0 (misma altitud, peso completo)
+          ≤150m diff → 0.85 (similar, ligera reducción)
+          ≤300m diff → 0.5 (diferente, reducción moderada)
+          ≤500m diff → 0.25 (estrato diferente, reducción fuerte)
+          >500m diff → 0.1 (otro mundo atmosférico)
+        """
+        if user_elev == 0 and station_elev == 0:
+            return 1.0  # Sin datos de altitud, no penalizar
+
+        diff = abs(user_elev - station_elev)
+
+        if diff <= 50:
+            return 1.0
+        elif diff <= 150:
+            return 0.85
+        elif diff <= 300:
+            return 0.5
+        elif diff <= 500:
+            return 0.25
+        else:
+            return 0.1
+
+    # ── Detección de outliers ───────────────────────────────
+
+    def _detect_outliers(self, stations: list):
+        """
+        Detecta estaciones con lecturas anómalas usando IQR.
+        NO las elimina — les reduce el peso (0.2x) y las marca
+        con is_outlier=True para que Gemini lo explique.
+
+        Con menos de 4 estaciones no hay suficientes datos para IQR.
+        """
+        aqis = [s.get("aqi", 0) for s in stations if s.get("aqi", 0) > 0 and s.get("source_type") != "model"]
+
+        if len(aqis) < 4:
+            for s in stations:
+                s["is_outlier"] = False
+            return
+
+        sorted_aqis = sorted(aqis)
+        n = len(sorted_aqis)
+        q1 = sorted_aqis[n // 4]
+        q3 = sorted_aqis[3 * n // 4]
+        iqr = q3 - q1
+
+        # Límites: más permisivos que el estándar (1.5) porque
+        # la variación espacial del AQI es naturalmente alta
+        lower = q1 - 2.0 * iqr
+        upper = q3 + 2.0 * iqr
+
+        for s in stations:
+            aqi = s.get("aqi", 0)
+            if s.get("source_type") == "model":
+                s["is_outlier"] = False
+                continue
+
+            if aqi < lower or aqi > upper:
+                s["is_outlier"] = True
+                logger.info(f"Outlier detectado: {s.get('name')} AQI={aqi} (rango={lower:.0f}-{upper:.0f})")
+            else:
+                s["is_outlier"] = False
+
+    # ── Deduplicación ────────────────────────────────────────
+
+    def _deduplicate(self, stations: list, min_distance_m: float = 500) -> list:
+        """
+        Elimina estaciones duplicadas (misma estación reportada por WAQI y OpenAQ).
+        Si dos estaciones están a <500m, queda la que tiene más datos.
+        """
+        if len(stations) <= 1:
+            return stations
+
+        unique = []
+        for s in stations:
+            is_dup = False
+            for u in unique:
+                dist = _haversine_m(s.get("lat", 0), s.get("lon", 0), u.get("lat", 0), u.get("lon", 0))
+                if dist < min_distance_m:
+                    # Quedarse con la que tiene más datos de contaminantes
+                    s_data = sum(1 for k in ["pm25", "no2", "o3"] if s.get(k) is not None)
+                    u_data = sum(1 for k in ["pm25", "no2", "o3"] if u.get(k) is not None)
+                    if s_data > u_data:
+                        unique.remove(u)
+                        unique.append(s)
+                    is_dup = True
+                    break
+            if not is_dup:
+                unique.append(s)
+
+        return unique
+
+    # ── Confianza ────────────────────────────────────────────
+
+    def _calculate_confidence(self, stations: list, aqi_range: dict) -> float:
+        """
+        Confianza basada en:
+        - Número de estaciones (más = mejor)
+        - Spread del rango AQI (menor = más concordancia)
+        - Presencia de estaciones reales
+        """
+        n = len(stations)
+        if n == 0:
             return 0.0
 
-        # Factor 1: cobertura de fuentes (0-0.4)
-        coverage = min(len(aqis) / 3.0, 1.0) * 0.4
+        # Factor 1: Cobertura (0-0.35)
+        coverage = min(n / 8.0, 1.0) * 0.35
 
-        # Factor 2: concordancia entre fuentes (0-0.4)
-        if len(aqis) >= 2:
-            mean = sum(aqis) / len(aqis)
-            variance = sum((x - mean) ** 2 for x in aqis) / len(aqis)
-            std_dev = variance ** 0.5
-            # Si la desviación estándar es < 20 puntos AQI, alta concordancia
-            agreement = max(0, 1 - std_dev / 50) * 0.4
+        # Factor 2: Concordancia (0-0.40)
+        spread = aqi_range.get("spread", 100)
+        if spread <= 15:
+            agreement = 0.40
+        elif spread <= 30:
+            agreement = 0.30
+        elif spread <= 50:
+            agreement = 0.20
+        elif spread <= 80:
+            agreement = 0.10
         else:
-            agreement = 0.15  # Solo una fuente, concordancia neutral
+            agreement = 0.05
 
-        # Factor 3: presencia de estaciones reales (0-0.2)
-        has_station = any(
-            d.get("source_type") == "station"
-            for d in results.values()
-            if d.get("aqi", 0) > 0
+        # Factor 3: Estaciones reales cercanas (0-0.25)
+        real_nearby = sum(
+            1 for s in stations
+            if s.get("source_type") == "station" and s.get("distance_m", 99999) < 5000
         )
-        station_bonus = 0.2 if has_station else 0.05
+        station_bonus = min(real_nearby / 3.0, 1.0) * 0.25
 
-        confidence = round(coverage + agreement + station_bonus, 2)
-        return min(confidence, 1.0)
+        return round(min(coverage + agreement + station_bonus, 1.0), 2)
+
+    # ── Fuentes resumidas ────────────────────────────────────
+
+    def _summarize_sources(self, stations: list) -> dict:
+        """Agrupa estaciones por fuente para el resumen."""
+        sources = {}
+        for s in stations:
+            src = s.get("source", "unknown")
+            if src not in sources:
+                sources[src] = {
+                    "station_count": 0,
+                    "stations": [],
+                    "avg_aqi": 0,
+                    "source_type": s.get("source_type", "unknown"),
+                }
+
+            sources[src]["station_count"] += 1
+            sources[src]["stations"].append({
+                "name": s.get("name", "Unknown"),
+                "aqi": s.get("aqi", 0),
+                "distance_km": round(s.get("distance_m", 0) / 1000, 1),
+                "elevation_m": round(s.get("elevation_m", 0)),
+                "altitude_factor": s.get("altitude_factor", 1.0),
+                "is_outlier": s.get("is_outlier", False),
+            })
+
+        # Calcular promedio por fuente
+        for src, info in sources.items():
+            aqis = [st["aqi"] for st in info["stations"] if st["aqi"] > 0]
+            info["avg_aqi"] = round(sum(aqis) / len(aqis)) if aqis else 0
+
+        return sources
+
+    # ── Contaminante dominante ────────────────────────────────
 
     def _dominant_pollutant(self, pollutants: dict) -> str:
-        """Determina el contaminante dominante."""
-        # Umbrales de referencia (µg/m³) para normalización
-        thresholds = {
-            "pm25": 35.4,
-            "pm10": 154.0,
-            "no2": 100.0,
-            "o3": 70.0,
-            "so2": 75.0,
-            "co": 9400.0,
-        }
-
+        thresholds = {"pm25": 35.4, "pm10": 154.0, "no2": 100.0, "o3": 70.0, "so2": 75.0, "co": 9400.0}
         worst = None
         worst_ratio = 0
-
         for key, threshold in thresholds.items():
             entry = pollutants.get(key)
             if entry and entry.get("value") is not None:
@@ -210,16 +424,27 @@ class AirQualityAggregator:
                 if ratio > worst_ratio:
                     worst_ratio = ratio
                     worst = key
-
         return worst
+
+    # ── Utilidades ────────────────────────────────────────────
+
+    def _safe_call(self, fn, *args):
+        try:
+            return fn(*args)
+        except Exception as e:
+            logger.error(f"Safe call error: {e}")
+            return None
 
     def _empty_result(self, lat: float, lon: float) -> dict:
         return {
             "combined_aqi": 0,
+            "aqi_range": {"low": 0, "high": 0, "spread": 0},
             "confidence": 0.0,
             "sources": {},
             "pollutants": {},
             "dominant_pollutant": None,
             "source_count": 0,
+            "station_count": 0,
+            "stations": [],
             "location": {"lat": lat, "lon": lon},
         }

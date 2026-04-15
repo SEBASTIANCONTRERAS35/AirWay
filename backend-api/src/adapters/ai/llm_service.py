@@ -105,42 +105,94 @@ class LLMService:
             return self._local_analysis(aggregated_data, mode)
 
     def _build_prompt(self, data: dict, mode: str, forecast: list = None) -> str:
-        """Construye el prompt con todos los datos disponibles."""
+        """Construye el prompt enriquecido con estaciones, altitud y outliers."""
         mode_label = MODE_LABELS.get(mode, mode)
+        loc = data.get("location", {})
+        user_elev = data.get("user_elevation_m", 0)
+        aqi_range = data.get("aqi_range", {})
 
-        # Formatear fuentes
-        sources_text = ""
-        for name, info in data.get("sources", {}).items():
-            sources_text += f"  - {name}: AQI={info.get('aqi', 'N/A')}, tipo={info.get('source_type', 'N/A')}"
-            if info.get("station_name"):
-                sources_text += f", estación={info['station_name']}"
-            sources_text += "\n"
+        # ── Estaciones individuales ──
+        stations_text = ""
+        stations = data.get("stations", [])
+        if stations:
+            for s in stations[:10]:  # Máximo 10 para no saturar el prompt
+                line = f"  - {s.get('name', '?')}"
+                line += f" ({s.get('source', '?')})"
+                line += f": AQI={s.get('aqi', '?')}"
+                line += f", dist={s.get('distance_m', 0)/1000:.1f}km"
+                elev = s.get("elevation_m", 0)
+                if elev:
+                    line += f", alt={elev:.0f}m"
+                    diff = abs(user_elev - elev) if user_elev else 0
+                    if diff > 200:
+                        line += f" (⚠️ {diff:.0f}m diferencia con usuario)"
+                factor = s.get("altitude_factor", 1.0)
+                if factor < 0.5:
+                    line += " [PESO REDUCIDO por altitud]"
+                if s.get("is_outlier"):
+                    line += " [OUTLIER]"
+                stations_text += line + "\n"
 
-        # Formatear contaminantes
+        # ── Contaminantes ──
         pollutants_text = ""
         for name, info in data.get("pollutants", {}).items():
             if info and info.get("value") is not None:
                 pollutants_text += f"  - {name}: {info['value']} {info.get('unit', 'µg/m³')} ({info.get('sources_reporting', 0)} fuentes)\n"
 
-        # Formatear pronóstico si existe
+        # ── Pronóstico ──
         forecast_text = ""
         if forecast:
-            forecast_text = "\nPronóstico próximas horas:\n"
-            for entry in forecast[:12]:  # Máximo 12 horas
+            forecast_text = "\nPRONÓSTICO PRÓXIMAS HORAS:\n"
+            for entry in forecast[:12]:
                 forecast_text += f"  - {entry['time']}: AQI={entry.get('aqi', 'N/A')}\n"
+
+        # ── Contexto topográfico ──
+        topo_text = ""
+        if user_elev and user_elev > 0:
+            station_elevs = [s.get("elevation_m", 0) for s in stations if s.get("elevation_m", 0) > 0]
+            if station_elevs:
+                min_elev = min(station_elevs)
+                max_elev = max(station_elevs)
+                if max_elev - min_elev > 200:
+                    topo_text = f"""
+CONTEXTO TOPOGRÁFICO:
+  Usuario está a {user_elev:.0f}m de altitud.
+  Estaciones van de {min_elev:.0f}m a {max_elev:.0f}m (desnivel {max_elev-min_elev:.0f}m).
+  Esto indica zona con variación altitudinal significativa.
+  Estaciones a mayor altitud pueden estar por encima de la capa de inversión térmica
+  y reportar aire más limpio que el que realmente respira el usuario."""
+
+        # ── Outliers ──
+        outliers = [s for s in stations if s.get("is_outlier")]
+        outlier_text = ""
+        if outliers:
+            outlier_text = "\nESTACIONES OUTLIER (lecturas anómalas, peso reducido):\n"
+            for o in outliers:
+                outlier_text += f"  - {o.get('name')}: AQI={o.get('aqi')} (posible causa: altitud diferente, sensor defectuoso, o microclima local)\n"
 
         prompt = f"""Analiza los siguientes datos de calidad del aire:
 
-UBICACIÓN: lat={data.get('location', {}).get('lat')}, lon={data.get('location', {}).get('lon')}
-AQI COMBINADO: {data.get('combined_aqi', 0)}
+UBICACIÓN: lat={loc.get('lat')}, lon={loc.get('lon')}, altitud={user_elev:.0f}m
+AQI INTERPOLADO (IDW): {data.get('combined_aqi', 0)}
+RANGO AQI: {aqi_range.get('low', 0)} - {aqi_range.get('high', 0)} (spread={aqi_range.get('spread', 0)})
 CONFIANZA: {data.get('confidence', 0):.0%}
 CONTAMINANTE DOMINANTE: {data.get('dominant_pollutant', 'desconocido')}
-FUENTES ({data.get('source_count', 0)}):
-{sources_text}
-CONTAMINANTES:
+TOTAL ESTACIONES: {data.get('station_count', 0)}
+
+ESTACIONES DE MONITOREO:
+{stations_text}
+CONTAMINANTES (interpolados por IDW):
 {pollutants_text}
+{topo_text}
+{outlier_text}
 {forecast_text}
 MODO DE TRANSPORTE: {mode_label}
+
+INSTRUCCIONES ADICIONALES:
+- Si hay gran spread (>50 puntos), explica POR QUÉ (altitud, distancia, microclimas)
+- Si hay outliers, explica por qué esa estación difiere
+- Recomienda las mejores horas basándote en el pronóstico
+- Adapta la recomendación al modo de transporte y la altitud del usuario
 
 Genera el análisis en formato JSON."""
 
@@ -226,10 +278,13 @@ Genera el análisis en formato JSON."""
         """
         Análisis local sin LLM (fallback).
         Genera recomendaciones basadas en reglas cuando no hay API key.
+        Ahora incluye info de estaciones, altitud y outliers.
         """
         aqi = data.get("combined_aqi", 0)
         source_count = data.get("source_count", 0)
+        station_count = data.get("station_count", 0)
         confidence = data.get("confidence", 0)
+        aqi_range = data.get("aqi_range", {})
         dominant = data.get("dominant_pollutant", "pm25")
         mode_label = MODE_LABELS.get(mode, mode)
 
@@ -259,21 +314,31 @@ Genera el análisis en formato JSON."""
             rec = f"Evita {mode_label} al aire libre. Busca transporte cerrado con filtración de aire."
 
         # Concordancia de fuentes
-        if source_count >= 3:
-            agreement = f"✅ {source_count} fuentes reportan datos. Confianza {confidence:.0%}."
-        elif source_count == 2:
-            agreement = f"⚠️ Solo {source_count} fuentes disponibles. Confianza {confidence:.0%}."
+        spread = aqi_range.get("spread", 0)
+        if station_count >= 5 and spread <= 30:
+            agreement = f"✅ {station_count} estaciones concuerdan (spread={spread}). Confianza {confidence:.0%}."
+        elif station_count >= 3:
+            agreement = f"📊 {station_count} estaciones, spread de {spread} puntos AQI. Confianza {confidence:.0%}."
+        elif station_count >= 1:
+            agreement = f"⚠️ Solo {station_count} estaciones. Confianza {confidence:.0%}."
         else:
-            agreement = f"⚠️ Solo 1 fuente disponible. Los datos podrían no ser representativos."
+            agreement = f"⚠️ Solo datos de modelo atmosférico. Los datos podrían no ser representativos."
 
         # Alertas
         alerts = []
+        if spread > 50:
+            alerts.append(f"Gran variación entre estaciones (AQI {aqi_range.get('low', 0)}-{aqi_range.get('high', 0)}). Posible efecto topográfico o microclimas")
         if confidence < 0.5:
-            alerts.append("Baja confianza en los datos — pocas fuentes o alta discrepancia")
+            alerts.append("Baja confianza en los datos — pocas estaciones o alta discrepancia")
         if dominant == "pm25":
             pm25_data = data.get("pollutants", {}).get("pm25")
             if pm25_data and pm25_data.get("value", 0) > 35:
                 alerts.append(f"PM2.5 elevado ({pm25_data['value']} µg/m³) — partículas finas que penetran los pulmones")
+        # Outliers
+        outliers = [s for s in data.get("stations", []) if s.get("is_outlier")]
+        if outliers:
+            names = ", ".join(o.get("name", "?") for o in outliers)
+            alerts.append(f"Estaciones con lecturas atípicas (peso reducido): {names}")
 
         return {
             "summary": summary,

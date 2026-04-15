@@ -119,14 +119,21 @@ class AirAnalysisView(APIView):
             category, color = _aqi_category(aqi)
 
             return Response({
-                "location": {"lat": lat, "lon": lon},
+                "location": {
+                    "lat": lat,
+                    "lon": lon,
+                    "elevation_m": combined.get("user_elevation_m", 0),
+                },
                 "timestamp": datetime.now(timezone.utc).isoformat(),
                 "combined_aqi": aqi,
+                "aqi_range": combined.get("aqi_range", {}),
                 "category": category,
                 "color": color,
                 "confidence": combined.get("confidence", 0),
                 "dominant_pollutant": combined.get("dominant_pollutant"),
                 "sources": combined.get("sources", {}),
+                "station_count": combined.get("station_count", 0),
+                "stations": combined.get("stations", []),
                 "pollutants": combined.get("pollutants", {}),
                 "ai_analysis": ai_analysis,
                 "forecast": forecast[:12],
