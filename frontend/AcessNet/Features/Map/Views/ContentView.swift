@@ -1022,15 +1022,22 @@ struct EnhancedMapView: View {
         // Centrar cámara en el punto seleccionado
         centerCamera(on: coordinate, distance: 800)
 
-        // Obtener datos de calidad del aire del GENERADOR SIMULADO (consistente con círculos)
+        // Obtener datos de calidad del aire del BACKEND REAL
         print("\n👆 ===== LONG PRESS EN MAPA =====")
         print("📍 Coordenadas: \(coordinate.latitude), \(coordinate.longitude)")
 
-        // Usar generador simulado (mismo que círculos del mapa)
-        let airQuality = AirQualityDataGenerator.shared.generateAirQuality(
-            for: coordinate,
-            includeExtendedMetrics: false
-        )
+        // Usar datos reales: buscar zona más cercana del grid, o fallback a valor por defecto
+        let airQuality: AirQualityPoint
+        if let nearestZone = airQualityGridManager.getZoneAtCoordinate(coordinate) {
+            airQuality = nearestZone.airQuality
+            print("✅ AQI from grid zone: \(Int(nearestZone.airQuality.aqi))")
+        } else {
+            airQuality = AirQualityPoint(
+                coordinate: coordinate,
+                aqi: 50, pm25: 15, pm10: 25, timestamp: Date()
+            )
+            print("⚠️ No grid zone nearby, using default AQI=50")
+        }
 
         // Obtener información del lugar con reverse geocoding
         searchManager.reverseGeocode(coordinate: coordinate) { address in
@@ -1416,11 +1423,16 @@ struct EnhancedMapView: View {
                     print("   Tipo: \(type(of: error))")
                     print("🔄 Activando fallback a datos simulados...")
 
-                    // Fallback a datos simulados
-                    let airQuality = AirQualityDataGenerator.shared.generateAirQuality(
-                        for: coordinate,
-                        includeExtendedMetrics: true
-                    )
+                    // Fallback a datos del grid o valor por defecto
+                    let airQuality: AirQualityPoint
+                    if let nearestZone = airQualityGridManager.getZoneAtCoordinate(coordinate) {
+                        airQuality = nearestZone.airQuality
+                    } else {
+                        airQuality = AirQualityPoint(
+                            coordinate: coordinate,
+                            aqi: 50, pm25: 15, pm10: 25, timestamp: Date()
+                        )
+                    }
 
                     await MainActor.run {
                         let locationInfo = LocationInfo(
@@ -1442,9 +1454,9 @@ struct EnhancedMapView: View {
                             subtitle: result.subtitle
                         )
 
-                        print("⚠️ LocationInfo mostrado con DATOS SIMULADOS (fallback)")
+                        print("⚠️ LocationInfo mostrado con fallback")
                         print("   AQI: \(Int(airQuality.aqi)) - \(airQuality.level.rawValue)")
-                        print("   Fuente: AirQualityDataGenerator (local)")
+                        print("   Fuente: Grid zone o default")
                         print("===== END BÚSQUEDA (FALLBACK) =====\n")
                     }
                 }
