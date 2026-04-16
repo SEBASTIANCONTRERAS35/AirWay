@@ -1,0 +1,40 @@
+# Infraestructura declarativa para Render.
+# https://render.com/docs/blueprint-spec
+#
+# Si ya hay un web service creado en Render, basta con:
+#   git push  → Render detecta cambios y re-deploya
+# Si se crea desde cero, apunta a este repo y a este blueprint.
+
+services:
+  - type: web
+    name: airway-api
+    plan: starter                # cambia a 'free' para pruebas
+    region: oregon
+    runtime: docker
+    dockerfilePath: ./backend-api/Dockerfile
+    dockerContext: ./backend-api
+    healthCheckPath: /api/v1/contingency/health
+    autoDeploy: true
+    envVars:
+      - key: DEBUG
+        value: "False"
+      - key: ALLOWED_HOSTS
+        value: ".onrender.com,localhost"
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DATABASE_URL
+        fromDatabase:
+          name: airway-postgres
+          property: connectionString
+      - key: OPENAQ_API_KEY
+        sync: false   # se configura manualmente en el dashboard
+      - key: WAQI_TOKEN
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+
+databases:
+  - name: airway-postgres
+    plan: starter
+    databaseName: airway
+    user: airway

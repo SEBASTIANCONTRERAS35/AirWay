@@ -67,6 +67,19 @@ scripts/full_pm25_cdmx.csv
 scripts/test_pm25_cdmx.csv
 scripts/train_pm25_cdmx.csv
 
+# ContingencyCast: datos históricos crudos (no van a git, muy grandes)
+backend-api/data/raw/
+backend-api/data/processed/
+!backend-api/data/raw/.gitkeep
+!backend-api/data/processed/.gitkeep
+
+# Modelos: ignorar RF baselines (grandes, no se usan en prod)
+# pero PERMITIR XGBoost JSON y metadata/calibradores (necesarios para inference)
+backend-api/data/models/rf_baseline_*.joblib
+backend-api/data/models/rf_baseline_metrics.json
+backend-api/data/models/quantile_metrics.json
+backend-api/data/models/xgb_metrics.json
+
 # ── Documentation PDFs ────────────────────────────────
 # Opcional: ignorar PDFs generados localmente
 # *.pdf

@@ -9,9 +9,17 @@
 /* Begin PBXBuildFile section */
 		09818B110EC04CD85CFAD96B /* WatchConnectivity.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 853CB617A120405AA888FF70 /* WatchConnectivity.framework */; };
 		0D5ACE4C5199CAE3AC17B14D /* AirWayWatch Watch App.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = CA5BA9FC466FCC4E715E5924 /* AirWayWatch Watch App.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		284479ACDD17EDED975B2E7D /* ContingencyService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2461B3CF337D2AC60EF503C2 /* ContingencyService.swift */; };
+		2AD48338BC5AC2A2B0BEB346 /* DriversPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 254E81DD506AAD6C8F6036A2 /* DriversPanel.swift */; };
+		5071B3AD23A62D5F5BE5B72A /* ProbabilityGauge.swift in Sources */ = {isa = PBXBuildFile; fileRef = F80D024AE539A4D4040E12C2 /* ProbabilityGauge.swift */; };
+		5F942F1473C57AF6B02DEDCD /* RecommendationsPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCB0079CBEF704CE36B97338 /* RecommendationsPanel.swift */; };
+		74090D7A8706020E310CAC6B /* ContingencyExplanationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A5DB5C9118E855DA151A4AA /* ContingencyExplanationService.swift */; };
+		9C36B1938EDB65E3E98C9ED1 /* ContingencyCastView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 69560ED823F603D7EED01308 /* ContingencyCastView.swift */; };
 		9D078957F3FA0F93980A0B33 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = E969B84657CEC6858660F838 /* Foundation.framework */; };
+		A3686ED8F8D47E80F3CCF98B /* HorizonCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 45742B669488985289343B67 /* HorizonCard.swift */; };
 		AADDC5622F90C25F00D74999 /* Lottie in Frameworks */ = {isa = PBXBuildFile; productRef = AADDC5612F90C25F00D74999 /* Lottie */; };
 		F1F20DA82A0669D385696AFB /* HealthKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C8B23D7491A144B87C0D0ADA /* HealthKit.framework */; };
+		FAE2558125D91D80175D0C5F /* ContingencyForecast.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06918F2B0DD4C7CF4AC4D605 /* ContingencyForecast.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -49,11 +57,19 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		06918F2B0DD4C7CF4AC4D605 /* ContingencyForecast.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ContingencyForecast.swift; sourceTree = "<group>"; };
+		2461B3CF337D2AC60EF503C2 /* ContingencyService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ContingencyService.swift; sourceTree = "<group>"; };
+		254E81DD506AAD6C8F6036A2 /* DriversPanel.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DriversPanel.swift; sourceTree = "<group>"; };
 		2621969C2E80F60C007E3787 /* AirWay.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = AirWay.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		45742B669488985289343B67 /* HorizonCard.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HorizonCard.swift; sourceTree = "<group>"; };
+		69560ED823F603D7EED01308 /* ContingencyCastView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ContingencyCastView.swift; sourceTree = "<group>"; };
 		853CB617A120405AA888FF70 /* WatchConnectivity.framework */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = wrapper.framework; name = WatchConnectivity.framework; path = System/Library/Frameworks/WatchConnectivity.framework; sourceTree = SDKROOT; };
+		9A5DB5C9118E855DA151A4AA /* ContingencyExplanationService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ContingencyExplanationService.swift; sourceTree = "<group>"; };
 		C8B23D7491A144B87C0D0ADA /* HealthKit.framework */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = wrapper.framework; name = HealthKit.framework; path = System/Library/Frameworks/HealthKit.framework; sourceTree = SDKROOT; };
 		CA5BA9FC466FCC4E715E5924 /* AirWayWatch Watch App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "AirWayWatch Watch App.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		CCB0079CBEF704CE36B97338 /* RecommendationsPanel.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RecommendationsPanel.swift; sourceTree = "<group>"; };
 		E969B84657CEC6858660F838 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/WatchOS.platform/Developer/SDKs/WatchOS11.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
+		F80D024AE539A4D4040E12C2 /* ProbabilityGauge.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ProbabilityGauge.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -77,6 +93,8 @@
 		};
 		4337E3BB2422E01595D0A845 /* AirWayWatch Watch App */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+			);
 			path = "AirWayWatch Watch App";
 			sourceTree = "<group>";
 		};
@@ -104,6 +122,16 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		13C835BC69F054D7A597B008 /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				2461B3CF337D2AC60EF503C2 /* ContingencyService.swift */,
+				9A5DB5C9118E855DA151A4AA /* ContingencyExplanationService.swift */,
+			);
+			name = Services;
+			path = Services;
+			sourceTree = "<group>";
+		};
 		262196932E80F60C007E3787 = {
 			isa = PBXGroup;
 			children = (
@@ -111,6 +139,7 @@
 				2621969D2E80F60C007E3787 /* Products */,
 				4C9DF664D19C0996154E0771 /* Frameworks */,
 				4337E3BB2422E01595D0A845 /* AirWayWatch Watch App */,
+				DE8A6FD8D58A23F9C7200242 /* AcessNet */,
 			);
 			sourceTree = "<group>";
 		};
@@ -123,6 +152,15 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
+		387AADDF8DAAE7026DD43021 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				06918F2B0DD4C7CF4AC4D605 /* ContingencyForecast.swift */,
+			);
+			name = Models;
+			path = Models;
+			sourceTree = "<group>";
+		};
 		4C9DF664D19C0996154E0771 /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
@@ -133,12 +171,72 @@
 			name = Frameworks;
 			sourceTree = "<group>";
 		};
+		516D1E80D2F1DB5F1D630CF7 /* Features */ = {
+			isa = PBXGroup;
+			children = (
+				DCD8286EA7670B0DAEEFE60D /* Contingency */,
+			);
+			name = Features;
+			path = Features;
+			sourceTree = "<group>";
+		};
+		5E1433DFD80EAEA661B41599 /* Core */ = {
+			isa = PBXGroup;
+			children = (
+				387AADDF8DAAE7026DD43021 /* Models */,
+				13C835BC69F054D7A597B008 /* Services */,
+			);
+			name = Core;
+			path = Core;
+			sourceTree = "<group>";
+		};
+		6681717A18848FA9E97F226F /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				69560ED823F603D7EED01308 /* ContingencyCastView.swift */,
+			);
+			name = Views;
+			path = Views;
+			sourceTree = "<group>";
+		};
+		DCD8286EA7670B0DAEEFE60D /* Contingency */ = {
+			isa = PBXGroup;
+			children = (
+				6681717A18848FA9E97F226F /* Views */,
+				F5521999F91A95DEB92BD7B5 /* Components */,
+			);
+			name = Contingency;
+			path = Contingency;
+			sourceTree = "<group>";
+		};
+		DE8A6FD8D58A23F9C7200242 /* AcessNet */ = {
+			isa = PBXGroup;
+			children = (
+				5E1433DFD80EAEA661B41599 /* Core */,
+				516D1E80D2F1DB5F1D630CF7 /* Features */,
+			);
+			name = AcessNet;
+			path = AcessNet;
+			sourceTree = "<group>";
+		};
 		EFA44D9E16AA73F54AE89B06 /* watchOS */ = {
 			isa = PBXGroup;
 			children = (
 				E969B84657CEC6858660F838 /* Foundation.framework */,
 			);
 			name = watchOS;
+			sourceTree = "<group>";
+		};
+		F5521999F91A95DEB92BD7B5 /* Components */ = {
+			isa = PBXGroup;
+			children = (
+				F80D024AE539A4D4040E12C2 /* ProbabilityGauge.swift */,
+				45742B669488985289343B67 /* HorizonCard.swift */,
+				254E81DD506AAD6C8F6036A2 /* DriversPanel.swift */,
+				CCB0079CBEF704CE36B97338 /* RecommendationsPanel.swift */,
+			);
+			name = Components;
+			path = Components;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -250,6 +348,14 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				FAE2558125D91D80175D0C5F /* ContingencyForecast.swift in Sources */,
+				284479ACDD17EDED975B2E7D /* ContingencyService.swift in Sources */,
+				74090D7A8706020E310CAC6B /* ContingencyExplanationService.swift in Sources */,
+				9C36B1938EDB65E3E98C9ED1 /* ContingencyCastView.swift in Sources */,
+				5071B3AD23A62D5F5BE5B72A /* ProbabilityGauge.swift in Sources */,
+				A3686ED8F8D47E80F3CCF98B /* HorizonCard.swift in Sources */,
+				2AD48338BC5AC2A2B0BEB346 /* DriversPanel.swift in Sources */,
+				5F942F1473C57AF6B02DEDCD /* RecommendationsPanel.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

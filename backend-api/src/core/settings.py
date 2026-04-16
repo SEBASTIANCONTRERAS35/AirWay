@@ -83,7 +83,7 @@ if DATABASE_URL:
             'PORT': url.port or 5432,
         }
     }
-else:
+elif os.getenv('DB_NAME'):
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.postgresql',
@@ -92,6 +92,15 @@ else:
             'PASSWORD': os.getenv('DB_PASSWORD'),
             'HOST': os.getenv('DB_HOST'),
             'PORT': os.getenv('DB_PORT'),
+        }
+    }
+else:
+    # Fallback para desarrollo local sin Postgres (sqlite en disco).
+    # ContingencyCast y otros endpoints ML no requieren DB, sólo necesita que Django arranque.
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
         }
     }
 
