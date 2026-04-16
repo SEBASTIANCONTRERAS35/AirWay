@@ -99,6 +99,7 @@ class AirAnalysisView(APIView):
             )
 
         mode = request.query_params.get("mode", "walk")
+        skip_ai = request.query_params.get("skip_ai", "false").lower() in ("true", "1", "yes")
         if mode not in ("walk", "run", "bike"):
             return Response(
                 {"error": "Modo inválido. Usa 'walk', 'run' o 'bike'."},
@@ -106,7 +107,7 @@ class AirAnalysisView(APIView):
             )
 
         try:
-            logger.info(f"AirAnalysis request: lat={lat}, lon={lon}, mode={mode}")
+            logger.info(f"AirAnalysis request: lat={lat}, lon={lon}, mode={mode}, skip_ai={skip_ai}")
 
             # Paso 1: Agregar datos de múltiples fuentes
             aggregator = AirQualityAggregator()
@@ -132,12 +133,16 @@ class AirAnalysisView(APIView):
             except Exception as e:
                 logger.warning(f"ML prediction error: {e}")
 
-            # Paso 4: Análisis con IA (ahora incluye predicción ML)
-            llm = LLMService()
-            ai_analysis = llm.analyze(
-                combined, mode=mode, forecast=forecast,
-                ml_prediction=ml_prediction,
-            )
+            # Paso 4: Análisis con IA (skip if client says skip_ai=true)
+            ai_analysis = None
+            if not skip_ai:
+                llm = LLMService()
+                ai_analysis = llm.analyze(
+                    combined, mode=mode, forecast=forecast,
+                    ml_prediction=ml_prediction,
+                )
+            else:
+                logger.info("skip_ai=true — skipping Gemini call")
 
             # Paso 5: Categoría AQI
             aqi = combined.get("combined_aqi", 0)

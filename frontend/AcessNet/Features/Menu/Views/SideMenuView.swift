@@ -5,6 +5,8 @@ import UserNotifications
 struct SideMenuView: View {
     @State private var isBusinessModeActive = false
     @State private var showBusinessToast = false
+    @State private var showingGasolinaMeter = false
+    @State private var showingContingencyCast = false
     var onBusinessToggle: (Bool) -> Void
     
     var body: some View {
@@ -87,6 +89,84 @@ struct SideMenuView: View {
                             .animation(.easeInOut(duration: 0.25), value: isBusinessModeActive)
                         }
                         
+                        // GasolinaMeter - NUEVO hub
+                        Button(action: {
+                            showingGasolinaMeter = true
+                        }) {
+                            HStack(spacing: 16) {
+                                ZStack {
+                                    Circle()
+                                        .fill(LinearGradient(
+                                            colors: [.green.opacity(0.3), .teal.opacity(0.2)],
+                                            startPoint: .topLeading, endPoint: .bottomTrailing
+                                        ))
+                                        .frame(width: 36, height: 36)
+                                    Image(systemName: "fuelpump.circle.fill")
+                                        .font(.title3)
+                                        .foregroundColor(.green)
+                                }
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("GasolinaMeter")
+                                        .font(.body)
+                                        .fontWeight(.medium)
+                                    Text("Combustible · Estaciones · Multimodal")
+                                        .font(.caption2)
+                                        .foregroundColor(.secondary)
+                                }
+                                Spacer()
+                                Text("NUEVO")
+                                    .font(.caption2.bold())
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 2)
+                                    .background(Color.green)
+                                    .foregroundColor(.white)
+                                    .cornerRadius(4)
+                            }
+                            .padding(.vertical, 12)
+                            .padding(.horizontal, 12)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+
+                        // ContingencyCast — pronóstico probabilístico contingencias
+                        Button(action: {
+                            showingContingencyCast = true
+                        }) {
+                            HStack(spacing: 16) {
+                                ZStack {
+                                    Circle()
+                                        .fill(LinearGradient(
+                                            colors: [.orange.opacity(0.3), .red.opacity(0.2)],
+                                            startPoint: .topLeading, endPoint: .bottomTrailing
+                                        ))
+                                        .frame(width: 36, height: 36)
+                                    Image(systemName: "wind.circle.fill")
+                                        .font(.title3)
+                                        .foregroundColor(.orange)
+                                }
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("ContingencyCast")
+                                        .font(.body)
+                                        .fontWeight(.medium)
+                                    Text("Pronóstico contingencia 48-72h")
+                                        .font(.caption2)
+                                        .foregroundColor(.secondary)
+                                }
+                                Spacer()
+                                Text("AI")
+                                    .font(.caption2.bold())
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 2)
+                                    .background(Color.orange)
+                                    .foregroundColor(.white)
+                                    .cornerRadius(4)
+                            }
+                            .padding(.vertical, 12)
+                            .padding(.horizontal, 12)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+
                         MenuItem(icon: "gearshape.fill", text: "Configuración")
                         MenuItem(icon: "star.fill", text: "Favoritos")
                         MenuItem(icon: "questionmark.circle.fill", text: "Ayuda")
@@ -116,6 +196,14 @@ struct SideMenuView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         // CAMBIO 2: Solicitar permiso para notificaciones cuando la vista aparece
         .onAppear(perform: requestNotificationPermission)
+        .sheet(isPresented: $showingGasolinaMeter) {
+            GasolinaMeterHubView()
+        }
+        .sheet(isPresented: $showingContingencyCast) {
+            NavigationStack {
+                ContingencyCastView()
+            }
+        }
         .overlay(
             VStack {
                 if showBusinessToast {

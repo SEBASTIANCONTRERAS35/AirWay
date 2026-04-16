@@ -26,6 +26,7 @@ struct AQIHomeView: View {
     @State private var bestTimeData: BestTimeResponse?
     @State private var dataLoadError: String?
     @State private var hasLoadedBackend: Bool = false
+    @State private var isRefreshing: Bool = false
     @State private var animatedAQI: CGFloat = 0
     @State private var animateGauges: Bool = false
     @State private var currentNotifIndex: Int = 0
@@ -60,21 +61,21 @@ struct AQIHomeView: View {
                         // AI Insight banner (collapsible, below AQI)
                         insightBanner
 
-                        // Loading indicator
-                        if isLoadingAQI {
-                            HStack(spacing: 8) {
+                        // Subtle refresh indicator (non-blocking)
+                        if isRefreshing {
+                            HStack(spacing: 6) {
                                 ProgressView()
-                                    .tint(.white)
-                                Text("Loading real-time data...")
-                                    .font(.caption)
-                                    .foregroundColor(.white.opacity(0.7))
+                                    .tint(.white.opacity(0.5))
+                                    .scaleEffect(0.7)
+                                Text("Actualizando...")
+                                    .font(.system(size: 11))
+                                    .foregroundColor(.white.opacity(0.4))
                             }
-                            .frame(maxWidth: .infinity)
-                            .padding()
+                            .transition(.opacity)
                         }
 
                         // Error message
-                        if let error = dataLoadError {
+                        if let error = dataLoadError, !hasLoadedBackend {
                             Text(error)
                                 .font(.caption)
                                 .foregroundColor(.red)
@@ -145,49 +146,114 @@ struct AQIHomeView: View {
         }
     }
 
-    // MARK: - Backend Data Loading
+    // MARK: - Smart Backend Loading (3-layer cache)
+    //
+    // Layer 1: Cache — load instantly from UserDefaults on open
+    // Layer 2: Quick AQI check — fetch /air/current (fast, no Gemini)
+    // Layer 3: Delta check — only call /air/analysis (with Gemini) if AQI changed ±10
+    //
+    // TTL: AQI data = 15 min, AI analysis = 30 min
+    //
+
+    private static let aqiTTL: TimeInterval = 15 * 60       // 15 minutes
+    private static let aiAnalysisTTL: TimeInterval = 30 * 60 // 30 minutes
+    private static let deltaThreshold: Int = 10              // AQI change to trigger Gemini
 
     private func loadBackendData() async {
+        // --- Layer 1: Load cache instantly ---
         await MainActor.run {
-            isLoadingAQI = true
+            loadCachedData()
             dataLoadError = nil
         }
 
+        let cachedAQI = airQualityData.aqi
         let lat = 19.4326
         let lon = -99.1332
         let backendURL = "https://airway-api.onrender.com/api/v1"
 
-        do {
-            guard let analysisURL = URL(string: "\(backendURL)/air/analysis?lat=\(lat)&lon=\(lon)&mode=walk") else { return }
-            let (analysisData, _) = try await URLSession.shared.data(from: analysisURL)
+        // Check if AQI cache is still fresh
+        let aqiCacheAge = Date().timeIntervalSince1970 - (UserDefaults.standard.double(forKey: "aqi_cache_timestamp"))
+        let aiCacheAge = Date().timeIntervalSince1970 - (UserDefaults.standard.double(forKey: "ai_cache_timestamp"))
 
-            let decoder = JSONDecoder()
-            let analysis = try decoder.decode(AnalysisResponse.self, from: analysisData)
+        let aqiStale = aqiCacheAge > Self.aqiTTL || cachedAQI == 0
+        let aiStale = aiCacheAge > Self.aiAnalysisTTL
 
-            await MainActor.run {
-                airQualityData = AirQualityData(
-                    aqi: analysis.combined_aqi,
-                    pm25: analysis.pollutants?.pm25?.value ?? 0,
-                    pm10: analysis.pollutants?.pm10?.value ?? 0,
-                    location: "CDMX Centro",
-                    city: "Ciudad de México",
-                    distance: 0,
-                    temperature: 18,
-                    humidity: 55,
-                    windSpeed: 5,
-                    uvIndex: 0,
-                    weatherCondition: .cloudy,
-                    lastUpdate: Date()
-                )
-                mlPrediction = analysis.ml_prediction
-                aiAnalysis = analysis.ai_analysis
-                hasLoadedBackend = true
-            }
-        } catch {
-            await MainActor.run { dataLoadError = "Error: \(error.localizedDescription)" }
+        // If nothing is stale, skip entirely
+        if !aqiStale && !aiStale && hasLoadedBackend {
+            print("[CACHE] AQI fresh (\(Int(aqiCacheAge))s), AI fresh (\(Int(aiCacheAge))s) — skipping fetch")
+            return
         }
 
-        // Best-time (independiente)
+        await MainActor.run { withAnimation { isRefreshing = true } }
+
+        // --- Layer 2: Quick AQI fetch (no Gemini) ---
+        var freshAQI: Int = cachedAQI
+        var freshAnalysis: AnalysisResponse?
+
+        if aqiStale {
+            do {
+                guard let quickURL = URL(string: "\(backendURL)/air/analysis?lat=\(lat)&lon=\(lon)&mode=walk&skip_ai=true") else { return }
+                let (data, _) = try await URLSession.shared.data(from: quickURL)
+                let analysis = try JSONDecoder().decode(AnalysisResponse.self, from: data)
+                freshAQI = analysis.combined_aqi
+                freshAnalysis = analysis
+
+                await MainActor.run {
+                    airQualityData = AirQualityData(
+                        aqi: analysis.combined_aqi,
+                        pm25: analysis.pollutants?.pm25?.value ?? 0,
+                        pm10: analysis.pollutants?.pm10?.value ?? 0,
+                        location: "CDMX Centro",
+                        city: "Ciudad de M\u{00E9}xico",
+                        distance: 0,
+                        temperature: 18,
+                        humidity: 55,
+                        windSpeed: 5,
+                        uvIndex: 0,
+                        weatherCondition: .cloudy,
+                        lastUpdate: Date()
+                    )
+                    // Keep cached AI analysis if skip_ai returned nil
+                    if let ml = analysis.ml_prediction { mlPrediction = ml }
+                    hasLoadedBackend = true
+                    cacheAQIData()
+                }
+
+                print("[CACHE] Quick AQI: \(freshAQI) (was \(cachedAQI), delta=\(abs(freshAQI - cachedAQI)))")
+            } catch {
+                await MainActor.run {
+                    if !hasLoadedBackend { dataLoadError = "Error: \(error.localizedDescription)" }
+                }
+            }
+        }
+
+        // --- Layer 3: Delta check — only call Gemini if AQI changed significantly ---
+        let delta = abs(freshAQI - cachedAQI)
+        let needsAI = aiStale && (delta >= Self.deltaThreshold || aiAnalysis == nil)
+
+        if needsAI {
+            print("[CACHE] AI stale + delta=\(delta) >= \(Self.deltaThreshold) — calling Gemini")
+            do {
+                guard let fullURL = URL(string: "\(backendURL)/air/analysis?lat=\(lat)&lon=\(lon)&mode=walk") else { return }
+                let (data, _) = try await URLSession.shared.data(from: fullURL)
+                let analysis = try JSONDecoder().decode(AnalysisResponse.self, from: data)
+
+                await MainActor.run {
+                    aiAnalysis = analysis.ai_analysis
+                    if let ml = analysis.ml_prediction { mlPrediction = ml }
+                    cacheAIAnalysis()
+                }
+                print("[CACHE] Gemini analysis updated")
+            } catch {
+                print("[CACHE] Gemini call failed: \(error.localizedDescription) — keeping cached AI")
+            }
+        } else if aiStale && delta < Self.deltaThreshold {
+            print("[CACHE] AI stale but delta=\(delta) < \(Self.deltaThreshold) — reusing cached AI")
+            // Just refresh the AI timestamp so we don't re-check for another 30min
+            UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: "ai_cache_timestamp")
+        }
+
+        // Best-time (independent, low cost)
         do {
             guard let btURL = URL(string: "\(backendURL)/air/best-time?lat=\(lat)&lon=\(lon)&mode=bike&hours=12") else { return }
             let (btData, _) = try await URLSession.shared.data(from: btURL)
@@ -195,7 +261,72 @@ struct AQIHomeView: View {
             await MainActor.run { bestTimeData = bestTime }
         } catch { }
 
-        await MainActor.run { isLoadingAQI = false }
+        await MainActor.run {
+            withAnimation { isRefreshing = false }
+            isLoadingAQI = false
+        }
+    }
+
+    // MARK: - Cache (UserDefaults)
+
+    private func cacheAQIData() {
+        let cached: [String: Any] = [
+            "aqi": airQualityData.aqi,
+            "pm25": airQualityData.pm25,
+            "pm10": airQualityData.pm10,
+            "location": airQualityData.location,
+            "city": airQualityData.city,
+            "temperature": airQualityData.temperature,
+            "humidity": airQualityData.humidity,
+            "windSpeed": airQualityData.windSpeed,
+        ]
+        UserDefaults.standard.set(cached, forKey: "aqi_cached_data")
+        UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: "aqi_cache_timestamp")
+    }
+
+    private func cacheAIAnalysis() {
+        if let ai = aiAnalysis, let data = try? JSONEncoder().encode(ai) {
+            UserDefaults.standard.set(data, forKey: "ai_cached_analysis")
+            UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: "ai_cache_timestamp")
+        }
+        if let ml = mlPrediction, let data = try? JSONEncoder().encode(ml) {
+            UserDefaults.standard.set(data, forKey: "ml_cached_prediction")
+        }
+    }
+
+    private func loadCachedData() {
+        // Load AQI data
+        if let cached = UserDefaults.standard.dictionary(forKey: "aqi_cached_data"),
+           let aqi = cached["aqi"] as? Int, aqi > 0 {
+
+            airQualityData = AirQualityData(
+                aqi: aqi,
+                pm25: cached["pm25"] as? Double ?? 0,
+                pm10: cached["pm10"] as? Double ?? 0,
+                location: cached["location"] as? String ?? "CDMX",
+                city: cached["city"] as? String ?? "Ciudad de M\u{00E9}xico",
+                distance: 0,
+                temperature: cached["temperature"] as? Double ?? 18,
+                humidity: cached["humidity"] as? Int ?? 55,
+                windSpeed: cached["windSpeed"] as? Double ?? 5,
+                uvIndex: 0,
+                weatherCondition: .cloudy,
+                lastUpdate: Date()
+            )
+            hasLoadedBackend = true
+        }
+
+        // Load cached AI analysis
+        if let aiData = UserDefaults.standard.data(forKey: "ai_cached_analysis"),
+           let ai = try? JSONDecoder().decode(AIAnalysisResponse.self, from: aiData) {
+            aiAnalysis = ai
+        }
+
+        // Load cached ML prediction
+        if let mlData = UserDefaults.standard.data(forKey: "ml_cached_prediction"),
+           let ml = try? JSONDecoder().decode(MLPredictionResponse.self, from: mlData) {
+            mlPrediction = ml
+        }
     }
 
     // MARK: - Header

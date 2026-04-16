@@ -1,0 +1,27 @@
+{
+  "source": "Subset de estaciones Pemex/BP/Shell CDMX con precios aproximados Profeco abril 2026",
+  "notes": "Fallback estático. Si Celery task exitoso, se sobrescribe con scrape live.",
+  "updated_at": "2026-04-13T00:00:00-06:00",
+  "stations": [
+    {"id": "pemex-reforma-100", "brand": "Pemex", "name": "Pemex Reforma 100", "address": "Paseo de la Reforma 100, Juárez, 06600 Cuauhtémoc", "lat": 19.4356, "lon": -99.1531, "magna": 23.62, "premium": 28.19, "diesel": 28.15},
+    {"id": "pemex-insurgentes-950", "brand": "Pemex", "name": "Pemex Insurgentes Sur", "address": "Av. Insurgentes Sur 950, Del Valle, 03100", "lat": 19.3762, "lon": -99.1754, "magna": 23.80, "premium": 28.42, "diesel": 28.28},
+    {"id": "pemex-tlalpan-1800", "brand": "Pemex", "name": "Pemex Calzada de Tlalpan", "address": "Calz. de Tlalpan 1800, Country Club, 04210", "lat": 19.3500, "lon": -99.1547, "magna": 23.89, "premium": 28.45, "diesel": 28.32},
+    {"id": "shell-polanco-anatole", "brand": "Shell", "name": "Shell Polanco", "address": "Av. Presidente Masaryk 61, Polanco V Sec., 11560", "lat": 19.4349, "lon": -99.2007, "magna": 24.10, "premium": 28.60, "diesel": 28.45},
+    {"id": "bp-reforma-chapultepec", "brand": "BP", "name": "BP Chapultepec", "address": "Paseo de la Reforma 382, Juárez, 06600", "lat": 19.4243, "lon": -99.1681, "magna": 23.55, "premium": 28.10, "diesel": 28.10},
+    {"id": "mobil-patriotismo-400", "brand": "Mobil", "name": "Mobil Patriotismo", "address": "Av. Patriotismo 400, San Pedro de los Pinos, 03800", "lat": 19.3906, "lon": -99.1878, "magna": 23.75, "premium": 28.35, "diesel": 28.25},
+    {"id": "pemex-iztapalapa-aztahuacan", "brand": "Pemex", "name": "Pemex Iztapalapa", "address": "Av. Santa Cruz Meyehualco, San Juan Xalpa, 09850", "lat": 19.3340, "lon": -99.0580, "magna": 23.50, "premium": 28.00, "diesel": 28.05},
+    {"id": "pemex-coyoacan-miguel-angel", "brand": "Pemex", "name": "Pemex Miguel Ángel de Quevedo", "address": "Av. Miguel Ángel de Quevedo 800, Coyoacán, 04100", "lat": 19.3402, "lon": -99.1768, "magna": 23.80, "premium": 28.42, "diesel": 28.28},
+    {"id": "shell-viaducto-1050", "brand": "Shell", "name": "Shell Viaducto", "address": "Viaducto Miguel Alemán 1050, Vértiz Narvarte, 03600", "lat": 19.3891, "lon": -99.1567, "magna": 23.95, "premium": 28.55, "diesel": 28.40},
+    {"id": "bp-observatorio-600", "brand": "BP", "name": "BP Observatorio", "address": "Av. Observatorio 600, Observatorio, 11870 Álvaro Obregón", "lat": 19.4003, "lon": -99.2185, "magna": 23.70, "premium": 28.30, "diesel": 28.20},
+    {"id": "pemex-toluca-lomas", "brand": "Pemex", "name": "Pemex Lomas Altas", "address": "Carretera México-Toluca Km 17, Lomas Altas", "lat": 19.4015, "lon": -99.2372, "magna": 23.85, "premium": 28.48, "diesel": 28.35},
+    {"id": "pemex-gam-5mayo", "brand": "Pemex", "name": "Pemex Gustavo A. Madero", "address": "Av. 5 de Mayo 60, Industrial, 07800", "lat": 19.4891, "lon": -99.1156, "magna": 23.65, "premium": 28.15, "diesel": 28.15},
+    {"id": "shell-periferico-sur-3400", "brand": "Shell", "name": "Shell Periférico Sur", "address": "Anillo Perif. Sur 3400, San Jerónimo Lídice", "lat": 19.3220, "lon": -99.2012, "magna": 24.05, "premium": 28.65, "diesel": 28.50},
+    {"id": "pemex-azcapotzalco-refineria", "brand": "Pemex", "name": "Pemex Azcapotzalco", "address": "Av. 22 de Febrero 199, Azcapotzalco", "lat": 19.4790, "lon": -99.1834, "magna": 23.58, "premium": 28.08, "diesel": 28.10},
+    {"id": "bp-eje-central-lazaro", "brand": "BP", "name": "BP Eje Central", "address": "Av. Lázaro Cárdenas 890, Vértiz Narvarte", "lat": 19.3912, "lon": -99.1451, "magna": 23.88, "premium": 28.50, "diesel": 28.35},
+    {"id": "pemex-xochimilco-mercado", "brand": "Pemex", "name": "Pemex Xochimilco", "address": "Av. Guadalupe I. Ramírez 200, Xochimilco", "lat": 19.2567, "lon": -99.1045, "magna": 23.72, "premium": 28.32, "diesel": 28.22},
+    {"id": "mobil-tepepan-circuito", "brand": "Mobil", "name": "Mobil Circuito Interior", "address": "Circuito Interior 500, Tepepan, 16020", "lat": 19.2778, "lon": -99.1345, "magna": 23.78, "premium": 28.40, "diesel": 28.30},
+    {"id": "pemex-miguel-hidalgo-anzures", "brand": "Pemex", "name": "Pemex Anzures", "address": "Av. Ejército Nacional 530, Polanco/Anzures, 11590", "lat": 19.4359, "lon": -99.1817, "magna": 23.90, "premium": 28.52, "diesel": 28.38},
+    {"id": "shell-av-universidad-1200", "brand": "Shell", "name": "Shell Universidad", "address": "Av. Universidad 1200, Xoco, 03330", "lat": 19.3675, "lon": -99.1672, "magna": 23.99, "premium": 28.58, "diesel": 28.44},
+    {"id": "bp-cuauhtemoc-viaducto", "brand": "BP", "name": "BP Cuauhtémoc", "address": "Av. Cuauhtémoc 500, Narvarte Poniente, 03020", "lat": 19.3985, "lon": -99.1612, "magna": 23.82, "premium": 28.45, "diesel": 28.30}
+  ]
+}

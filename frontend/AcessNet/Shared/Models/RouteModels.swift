@@ -22,6 +22,8 @@ enum RoutePreference {
     case safest                                          // Ruta más segura (evitar incidentes)
     case avoidIncidents                                   // Evitar áreas con incidentes activos
     case balancedSafety                                   // Balanceado con seguridad (33% cada uno)
+    case ecoFuel                                          // Minimizar consumo combustible (50%) + aire (20%) + tiempo (10%) + CO2 (20%)
+    case cheapest                                         // Minimizar costo en MXN (70%) + tiempo (20%) + aire (10%)
     case customWeighted(timeWeight: Double, airQualityWeight: Double)  // Pesos personalizados
     case customWeightedSafety(timeWeight: Double, airQualityWeight: Double, safetyWeight: Double)  // Pesos personalizados con seguridad
 
@@ -38,7 +40,8 @@ enum RoutePreference {
         switch self {
         case .fastest, .shortest, .avoidHighways, .safest, .avoidIncidents:
             return false
-        case .cleanestAir, .balanced, .healthOptimized, .customWeighted, .balancedSafety, .customWeightedSafety:
+        case .cleanestAir, .balanced, .healthOptimized, .customWeighted, .balancedSafety, .customWeightedSafety,
+             .ecoFuel, .cheapest:
             return true
         }
     }
@@ -46,12 +49,20 @@ enum RoutePreference {
     /// Indica si esta preferencia requiere datos de incidentes
     var requiresIncidentData: Bool {
         switch self {
-        case .fastest, .shortest, .avoidHighways, .cleanestAir:
+        case .fastest, .shortest, .avoidHighways, .cleanestAir, .ecoFuel, .cheapest:
             return false
         case .balanced, .healthOptimized, .customWeighted:
             return false
         case .safest, .avoidIncidents, .balancedSafety, .customWeightedSafety:
             return true
+        }
+    }
+
+    /// Indica si esta preferencia requiere estimación de combustible
+    var requiresFuelData: Bool {
+        switch self {
+        case .ecoFuel, .cheapest: return true
+        default: return false
         }
     }
 }

@@ -4,6 +4,20 @@
 <dict>
 	<key>NSCameraUsageDescription</key>
 	<string>AcessNet uses the camera to visualize air quality particles in augmented reality, helping you see invisible PM2.5 pollution in your surroundings.</string>
+	<!-- Permitir HTTP sólo a localhost (para test del backend local). Producción usa HTTPS. -->
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSExceptionDomains</key>
+		<dict>
+			<key>localhost</key>
+			<dict>
+				<key>NSExceptionAllowsInsecureHTTPLoads</key>
+				<true/>
+				<key>NSIncludesSubdomains</key>
+				<true/>
+			</dict>
+		</dict>
+	</dict>
 	<key>UIAppFonts</key>
 	<array>
 		<string>HarmonyOS_Sans_Black_Italic.ttf</string>

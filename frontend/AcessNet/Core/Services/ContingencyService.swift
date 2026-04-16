@@ -30,7 +30,21 @@ final class ContingencyService {
 
     static let shared = ContingencyService()
 
-    private let baseURL = "https://airway-api.onrender.com/api/v1"
+    /// En DEBUG + simulador se apunta al backend local (http://localhost:8000).
+    /// En cualquier otro caso (device físico o Release) se usa producción.
+    /// Override manual: setear UserDefaults "contingency_api_base".
+    private let baseURL: String = {
+        if let override = UserDefaults.standard.string(forKey: "contingency_api_base"),
+           !override.isEmpty {
+            return override
+        }
+        #if DEBUG && targetEnvironment(simulator)
+        return "http://localhost:8000/api/v1"
+        #else
+        return "https://airway-api.onrender.com/api/v1"
+        #endif
+    }()
+
     private let session: URLSession
 
     private init() {

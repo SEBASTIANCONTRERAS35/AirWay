@@ -359,6 +359,14 @@ extension RoutePreference {
         case .balancedSafety:
             return (0.33, 0.33)  // 33% tiempo, 33% aire (34% safety implícito)
 
+        case .ecoFuel:
+            // Scoring "clásico" aire/tiempo; el fuel score se aplica como bonus en combinedScore
+            return (0.2, 0.4)  // 20% tiempo, 40% aire (el resto va a fuel en weightsWithFuel)
+
+        case .cheapest:
+            // Prioridad costo; aquí sólo los pesos clásicos. Fuel (70%) se añade abajo.
+            return (0.2, 0.1)
+
         case .customWeighted(let timeWeight, let airWeight):
             // Normalizar para que sumen 1.0
             let total = timeWeight + airWeight
@@ -401,6 +409,12 @@ extension RoutePreference {
         case .balancedSafety:
             return (0.40, 0.10, 0.50)  // 50% safety, 40% time, 10% air - Prioriza seguridad + rapidez
 
+        case .ecoFuel:
+            return (0.1, 0.2, 0.0)  // 10% tiempo, 20% aire (el 70% va a fuel via weightsWithFuel)
+
+        case .cheapest:
+            return (0.2, 0.1, 0.0)  // 20% tiempo, 10% aire (70% fuel via weightsWithFuel)
+
         case .customWeighted(let timeWeight, let airWeight):
             // Añadir un peso de seguridad mínimo
             let safetyWeight = 0.1
@@ -412,6 +426,21 @@ extension RoutePreference {
             let total = timeWeight + airWeight + safetyWeight
             guard total > 0 else { return (0.33, 0.33, 0.34) }
             return (timeWeight / total, airWeight / total, safetyWeight / total)
+        }
+    }
+
+    /// Pesos combinados con fuel (time, air, safety, fuel). Usado cuando requiresFuelData == true.
+    /// Los pesos suman 1.0.
+    var weightsWithFuel: (timeWeight: Double, airQualityWeight: Double, safetyWeight: Double, fuelWeight: Double) {
+        switch self {
+        case .ecoFuel:
+            return (0.1, 0.2, 0.0, 0.7)  // 70% fuel prioritario
+        case .cheapest:
+            return (0.2, 0.1, 0.0, 0.7)  // 70% costo $
+        default:
+            // Cualquier otra: el fuel tiene peso 0
+            let (t, a, s) = self.weightsWithSafety
+            return (t, a, s, 0.0)
         }
     }
 
@@ -427,6 +456,8 @@ extension RoutePreference {
         case .safest: return "Safest Route"
         case .avoidIncidents: return "Avoid Incidents"
         case .balancedSafety: return "Balanced with Safety"
+        case .ecoFuel: return "🌿 Eco-combustible"
+        case .cheapest: return "💰 Más barata"
         case .customWeighted(let timeWeight, let airWeight):
             return "Custom (\(Int(timeWeight * 100))% time, \(Int(airWeight * 100))% air)"
         case .customWeightedSafety(let timeWeight, let airWeight, let safetyWeight):
@@ -446,6 +477,8 @@ extension RoutePreference {
         case .safest: return "shield.fill"
         case .avoidIncidents: return "exclamationmark.shield"
         case .balancedSafety: return "shield.checkered"
+        case .ecoFuel: return "leaf.circle.fill"
+        case .cheapest: return "pesosign.circle.fill"
         case .customWeighted: return "slider.horizontal.3"
         case .customWeightedSafety: return "slider.horizontal.below.square.fill.and.square"
         }

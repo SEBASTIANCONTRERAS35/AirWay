@@ -1,0 +1,69 @@
+{
+  "source": "CONUEE Catálogo Rendimiento Vehículos Ligeros 2024-2025 + INECC Ecovehículos",
+  "notes": "km/L combinado ciudad+carretera. Subset popular CDMX. Extender con https://www.datos.gob.mx/dataset/catalogo_rendimiento_combustible_vehiculos_ligeros_venta_mexico",
+  "vehicles": [
+    {"make": "Nissan", "model": "Versa", "year": 2019, "fuel_type": "magna", "conuee_km_per_l": 15.1, "engine_cc": 1600, "transmission": "manual", "weight_kg": 1104},
+    {"make": "Nissan", "model": "Versa", "year": 2022, "fuel_type": "magna", "conuee_km_per_l": 16.4, "engine_cc": 1600, "transmission": "cvt", "weight_kg": 1100},
+    {"make": "Nissan", "model": "March", "year": 2018, "fuel_type": "magna", "conuee_km_per_l": 16.9, "engine_cc": 1600, "transmission": "manual", "weight_kg": 965},
+    {"make": "Nissan", "model": "Sentra", "year": 2021, "fuel_type": "magna", "conuee_km_per_l": 15.6, "engine_cc": 1800, "transmission": "cvt", "weight_kg": 1354},
+    {"make": "Nissan", "model": "X-Trail", "year": 2022, "fuel_type": "magna", "conuee_km_per_l": 12.4, "engine_cc": 2500, "transmission": "cvt", "weight_kg": 1548},
+    {"make": "Nissan", "model": "Kicks", "year": 2022, "fuel_type": "magna", "conuee_km_per_l": 15.7, "engine_cc": 1600, "transmission": "cvt", "weight_kg": 1212},
+
+    {"make": "Chevrolet", "model": "Aveo", "year": 2018, "fuel_type": "magna", "conuee_km_per_l": 14.2, "engine_cc": 1600, "transmission": "manual", "weight_kg": 1150},
+    {"make": "Chevrolet", "model": "Aveo", "year": 2023, "fuel_type": "magna", "conuee_km_per_l": 15.8, "engine_cc": 1500, "transmission": "manual", "weight_kg": 1100},
+    {"make": "Chevrolet", "model": "Beat", "year": 2021, "fuel_type": "magna", "conuee_km_per_l": 17.3, "engine_cc": 1200, "transmission": "manual", "weight_kg": 965},
+    {"make": "Chevrolet", "model": "Cavalier", "year": 2022, "fuel_type": "magna", "conuee_km_per_l": 14.9, "engine_cc": 1500, "transmission": "cvt", "weight_kg": 1280},
+    {"make": "Chevrolet", "model": "Onix", "year": 2023, "fuel_type": "magna", "conuee_km_per_l": 16.0, "engine_cc": 1200, "transmission": "automatic", "weight_kg": 1100},
+    {"make": "Chevrolet", "model": "Tracker", "year": 2022, "fuel_type": "magna", "conuee_km_per_l": 14.3, "engine_cc": 1200, "transmission": "cvt", "weight_kg": 1310},
+    {"make": "Chevrolet", "model": "Spark", "year": 2020, "fuel_type": "magna", "conuee_km_per_l": 16.5, "engine_cc": 1200, "transmission": "manual", "weight_kg": 1025},
+
+    {"make": "Volkswagen", "model": "Jetta", "year": 2020, "fuel_type": "magna", "conuee_km_per_l": 14.8, "engine_cc": 2000, "transmission": "manual", "weight_kg": 1350},
+    {"make": "Volkswagen", "model": "Vento", "year": 2022, "fuel_type": "magna", "conuee_km_per_l": 16.7, "engine_cc": 1600, "transmission": "manual", "weight_kg": 1200},
+    {"make": "Volkswagen", "model": "Polo", "year": 2021, "fuel_type": "magna", "conuee_km_per_l": 17.1, "engine_cc": 1600, "transmission": "manual", "weight_kg": 1106},
+    {"make": "Volkswagen", "model": "Tiguan", "year": 2022, "fuel_type": "premium", "conuee_km_per_l": 12.7, "engine_cc": 1400, "transmission": "automatic", "weight_kg": 1550},
+    {"make": "Volkswagen", "model": "Virtus", "year": 2023, "fuel_type": "magna", "conuee_km_per_l": 16.2, "engine_cc": 1600, "transmission": "manual", "weight_kg": 1180},
+
+    {"make": "Toyota", "model": "Corolla", "year": 2021, "fuel_type": "magna", "conuee_km_per_l": 15.9, "engine_cc": 1800, "transmission": "cvt", "weight_kg": 1360},
+    {"make": "Toyota", "model": "Yaris", "year": 2022, "fuel_type": "magna", "conuee_km_per_l": 17.8, "engine_cc": 1500, "transmission": "cvt", "weight_kg": 1110},
+    {"make": "Toyota", "model": "Hilux", "year": 2022, "fuel_type": "diesel", "conuee_km_per_l": 12.9, "engine_cc": 2400, "transmission": "manual", "weight_kg": 2100},
+    {"make": "Toyota", "model": "Prius", "year": 2021, "fuel_type": "hybrid", "conuee_km_per_l": 26.0, "engine_cc": 1800, "transmission": "cvt", "weight_kg": 1395},
+    {"make": "Toyota", "model": "Corolla Cross", "year": 2023, "fuel_type": "hybrid", "conuee_km_per_l": 22.0, "engine_cc": 2000, "transmission": "cvt", "weight_kg": 1450},
+
+    {"make": "Honda", "model": "Civic", "year": 2022, "fuel_type": "magna", "conuee_km_per_l": 15.4, "engine_cc": 2000, "transmission": "cvt", "weight_kg": 1350},
+    {"make": "Honda", "model": "City", "year": 2022, "fuel_type": "magna", "conuee_km_per_l": 16.8, "engine_cc": 1500, "transmission": "cvt", "weight_kg": 1180},
+    {"make": "Honda", "model": "CR-V", "year": 2023, "fuel_type": "magna", "conuee_km_per_l": 13.1, "engine_cc": 1500, "transmission": "cvt", "weight_kg": 1595},
+    {"make": "Honda", "model": "HR-V", "year": 2022, "fuel_type": "magna", "conuee_km_per_l": 15.2, "engine_cc": 1800, "transmission": "cvt", "weight_kg": 1297},
+
+    {"make": "Kia", "model": "Rio", "year": 2022, "fuel_type": "magna", "conuee_km_per_l": 16.5, "engine_cc": 1600, "transmission": "manual", "weight_kg": 1180},
+    {"make": "Kia", "model": "Forte", "year": 2022, "fuel_type": "magna", "conuee_km_per_l": 15.3, "engine_cc": 2000, "transmission": "cvt", "weight_kg": 1280},
+    {"make": "Kia", "model": "Sportage", "year": 2023, "fuel_type": "magna", "conuee_km_per_l": 13.2, "engine_cc": 2500, "transmission": "automatic", "weight_kg": 1550},
+
+    {"make": "Hyundai", "model": "Accent", "year": 2022, "fuel_type": "magna", "conuee_km_per_l": 16.0, "engine_cc": 1600, "transmission": "manual", "weight_kg": 1172},
+    {"make": "Hyundai", "model": "Elantra", "year": 2022, "fuel_type": "magna", "conuee_km_per_l": 15.7, "engine_cc": 2000, "transmission": "cvt", "weight_kg": 1342},
+    {"make": "Hyundai", "model": "Creta", "year": 2023, "fuel_type": "magna", "conuee_km_per_l": 13.9, "engine_cc": 1600, "transmission": "automatic", "weight_kg": 1395},
+    {"make": "Hyundai", "model": "Tucson", "year": 2022, "fuel_type": "magna", "conuee_km_per_l": 13.6, "engine_cc": 2000, "transmission": "automatic", "weight_kg": 1554},
+
+    {"make": "Mazda", "model": "3", "year": 2022, "fuel_type": "premium", "conuee_km_per_l": 14.9, "engine_cc": 2500, "transmission": "automatic", "weight_kg": 1350},
+    {"make": "Mazda", "model": "CX-5", "year": 2022, "fuel_type": "premium", "conuee_km_per_l": 13.0, "engine_cc": 2500, "transmission": "automatic", "weight_kg": 1585},
+    {"make": "Mazda", "model": "CX-30", "year": 2023, "fuel_type": "magna", "conuee_km_per_l": 14.1, "engine_cc": 2500, "transmission": "automatic", "weight_kg": 1450},
+
+    {"make": "Ford", "model": "Ranger", "year": 2022, "fuel_type": "diesel", "conuee_km_per_l": 13.4, "engine_cc": 3200, "transmission": "manual", "weight_kg": 2150},
+    {"make": "Ford", "model": "Figo", "year": 2021, "fuel_type": "magna", "conuee_km_per_l": 16.9, "engine_cc": 1500, "transmission": "manual", "weight_kg": 1040},
+    {"make": "Ford", "model": "Escape", "year": 2022, "fuel_type": "magna", "conuee_km_per_l": 13.5, "engine_cc": 1500, "transmission": "automatic", "weight_kg": 1590},
+
+    {"make": "Suzuki", "model": "Swift", "year": 2022, "fuel_type": "magna", "conuee_km_per_l": 17.5, "engine_cc": 1200, "transmission": "manual", "weight_kg": 880},
+    {"make": "Suzuki", "model": "Ignis", "year": 2022, "fuel_type": "magna", "conuee_km_per_l": 18.3, "engine_cc": 1200, "transmission": "manual", "weight_kg": 810},
+    {"make": "Suzuki", "model": "Vitara", "year": 2022, "fuel_type": "magna", "conuee_km_per_l": 15.2, "engine_cc": 1600, "transmission": "manual", "weight_kg": 1185},
+
+    {"make": "SEAT", "model": "Ibiza", "year": 2022, "fuel_type": "magna", "conuee_km_per_l": 16.5, "engine_cc": 1600, "transmission": "manual", "weight_kg": 1110},
+    {"make": "SEAT", "model": "Leon", "year": 2021, "fuel_type": "premium", "conuee_km_per_l": 14.2, "engine_cc": 1400, "transmission": "dsg", "weight_kg": 1350},
+
+    {"make": "Mitsubishi", "model": "L200", "year": 2022, "fuel_type": "diesel", "conuee_km_per_l": 13.7, "engine_cc": 2400, "transmission": "manual", "weight_kg": 2050},
+    {"make": "Mitsubishi", "model": "Outlander", "year": 2023, "fuel_type": "magna", "conuee_km_per_l": 11.9, "engine_cc": 2400, "transmission": "cvt", "weight_kg": 1725},
+
+    {"make": "Tesla", "model": "Model 3", "year": 2023, "fuel_type": "electric", "conuee_km_per_l": 0, "engine_cc": 0, "transmission": "automatic", "weight_kg": 1611},
+    {"make": "Tesla", "model": "Model Y", "year": 2023, "fuel_type": "electric", "conuee_km_per_l": 0, "engine_cc": 0, "transmission": "automatic", "weight_kg": 1909},
+    {"make": "BYD", "model": "Dolphin", "year": 2024, "fuel_type": "electric", "conuee_km_per_l": 0, "engine_cc": 0, "transmission": "automatic", "weight_kg": 1405},
+    {"make": "JAC", "model": "E-JS4", "year": 2024, "fuel_type": "electric", "conuee_km_per_l": 0, "engine_cc": 0, "transmission": "automatic", "weight_kg": 1680}
+  ]
+}

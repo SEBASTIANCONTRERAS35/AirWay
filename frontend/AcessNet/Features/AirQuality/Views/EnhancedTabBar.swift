@@ -115,7 +115,7 @@ struct EnhancedTabBar: View {
         )
         .clipShape(Capsule())
         .padding(.horizontal, 40)
-        .padding(.bottom, 8)
+        .padding(.bottom, 28)
         .shadow(color: .black.opacity(0.3), radius: 16, x: 0, y: 8)
     }
 

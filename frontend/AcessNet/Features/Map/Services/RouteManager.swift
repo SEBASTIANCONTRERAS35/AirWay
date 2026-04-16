@@ -202,6 +202,10 @@ class RouteManager: ObservableObject {
         case .customWeightedSafety, .safest, .avoidIncidents, .balancedSafety:
             // Sin configuración adicional específica para MKDirections en estos modos
             break
+        case .ecoFuel, .cheapest:
+            // GasolinaMeter aplica scoring post-cálculo via FuelEstimateStore;
+            // MKDirections no tiene parámetro nativo de fuel.
+            break
         case .shortest:
             // MKDirections no tiene opción explícita para ruta más corta,
             // pero podemos filtrar las alternativas después
@@ -605,6 +609,10 @@ class RouteManager: ObservableObject {
         case .safest, .avoidIncidents, .balancedSafety:
             // Para seguridad, ordenar por tiempo pero el scoring avanzado manejará la prioridad real
             return routes.sorted { $0.expectedTravelTime < $1.expectedTravelTime }
+        case .ecoFuel, .cheapest:
+            // Ordenar por distancia como proxy inicial (fuel correlaciona con km).
+            // El re-ordenamiento real ocurre después vía FuelEstimateStore en performAdvancedScoring.
+            return routes.sorted { $0.distanceInKm < $1.distanceInKm }
         }
     }
 
