@@ -11,6 +11,7 @@ import Combine
 import CoreLocation
 
 struct AQIHomeView: View {
+    @EnvironmentObject var appSettings: AppSettings
     @Binding var showBusinessPulse: Bool
     @State private var airQualityData: AirQualityData = .sample
     @State private var selectedForecastTab: ForecastTab = .hourly
@@ -44,8 +45,8 @@ struct AQIHomeView: View {
     var body: some View {
         NavigationView {
             ZStack {
-                // Background — dark solid
-                Color(hex: "#0A0A0F")
+                // Background — dynamic weather
+                WeatherBackground(condition: activeWeather)
                     .ignoresSafeArea()
 
                 ScrollView(showsIndicators: false) {
@@ -105,6 +106,7 @@ struct AQIHomeView: View {
         .sheet(isPresented: $showSearchModal) {
             LocationSearchModal(searchText: $searchText, onLocationSelected: handleLocationSelection)
         }
+        .environment(\.weatherTheme, theme)
         .task {
             guard !hasLoadedBackend else { return }
             await loadBackendData()
@@ -697,10 +699,10 @@ struct AQIHomeView: View {
                 }
                 .background(
                     RoundedRectangle(cornerRadius: 14)
-                        .fill(.white.opacity(0.04))
+                        .fill(theme.cardColor)
                         .overlay(
                             RoundedRectangle(cornerRadius: 14)
-                                .stroke(notif.color.opacity(0.12), lineWidth: 1)
+                                .stroke(notif.color.opacity(0.15), lineWidth: 1)
                         )
                 )
                 .padding(.horizontal, 16)
@@ -853,13 +855,22 @@ struct AQIHomeView: View {
 
     // MARK: - Glass Card Background
 
+    private var activeWeather: WeatherCondition {
+        appSettings.weatherOverride ?? airQualityData.weatherCondition
+    }
+
+    private var theme: WeatherTheme {
+        WeatherTheme(condition: activeWeather)
+    }
+
     private var glassCard: some View {
         RoundedRectangle(cornerRadius: 20)
-            .fill(.ultraThinMaterial.opacity(0.15))
+            .fill(theme.cardColor)
             .overlay(
                 RoundedRectangle(cornerRadius: 20)
-                    .stroke(.white.opacity(0.08), lineWidth: 1)
+                    .stroke(theme.borderColor, lineWidth: 1)
             )
+            .shadow(color: .black.opacity(0.3), radius: 10, y: 4)
     }
 }
 
@@ -1357,6 +1368,7 @@ struct HourlyForecastItem: View {
 // MARK: - Exposure Activity Rings (Apple-style)
 
 struct ExposureCircularChart: View {
+    @Environment(\.weatherTheme) private var theme
     @State private var animate = false
 
     let homeHours: CGFloat = 6
@@ -1424,10 +1436,10 @@ struct ExposureCircularChart: View {
         .padding(16)
         .background(
             RoundedRectangle(cornerRadius: 20)
-                .fill(.white.opacity(0.04))
+                .fill(theme.cardColor.opacity(0.8))
                 .overlay(
                     RoundedRectangle(cornerRadius: 20)
-                        .stroke(.white.opacity(0.08), lineWidth: 1)
+                        .stroke(theme.borderColor, lineWidth: 1)
                 )
         )
         .onAppear {
