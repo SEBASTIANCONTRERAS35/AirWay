@@ -10,45 +10,78 @@ import SwiftUI
 struct DriversPanel: View {
     let drivers: [ForecastDriver]
 
+    @State private var animate: Bool = false
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Image(systemName: "questionmark.circle.fill")
-                    .foregroundColor(.blue)
-                Text("¿Por qué esta probabilidad?")
-                    .font(.headline)
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 10) {
+                ZStack {
+                    Circle()
+                        .fill(Color.white.opacity(0.1))
+                        .frame(width: 32, height: 32)
+                    Image(systemName: "chart.bar.fill")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundColor(.white.opacity(0.85))
+                }
+
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("¿Por qué esta probabilidad?")
+                        .font(.system(size: 14, weight: .heavy))
+                        .foregroundColor(.white)
+                    Text("Top factores del modelo")
+                        .font(.system(size: 9, weight: .medium))
+                        .foregroundColor(.white.opacity(0.5))
+                        .textCase(.uppercase)
+                        .tracking(1.0)
+                }
             }
 
-            ForEach(drivers.prefix(5)) { driver in
-                DriverRow(driver: driver)
+            VStack(spacing: 10) {
+                ForEach(Array(drivers.prefix(5).enumerated()), id: \.element.id) { index, driver in
+                    DriverRow(driver: driver, animate: animate, index: index)
+                }
             }
         }
         .padding(16)
         .background(
-            RoundedRectangle(cornerRadius: 16)
-                .fill(.ultraThinMaterial)
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(Color.white.opacity(0.05))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                )
         )
+        .onAppear {
+            withAnimation(.easeOut(duration: 0.4)) { animate = true }
+        }
     }
 }
 
 private struct DriverRow: View {
     let driver: ForecastDriver
+    let animate: Bool
+    let index: Int
 
     var body: some View {
-        HStack {
+        HStack(spacing: 10) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(driver.humanName)
-                    .font(.subheadline.weight(.medium))
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(.white.opacity(0.9))
+                    .lineLimit(1)
                 if let value = driver.value {
                     Text(formatValue(value))
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                        .font(.system(size: 10, weight: .medium, design: .monospaced))
+                        .foregroundColor(.white.opacity(0.5))
                 }
             }
-            Spacer()
-            ImportanceBar(importance: driver.importance)
-                .frame(width: 60, height: 6)
+            Spacer(minLength: 6)
+            ImportanceBar(importance: driver.importance, animate: animate, delay: 0.15 + Double(index) * 0.08)
+                .frame(width: 80, height: 6)
         }
+        .opacity(animate ? 1 : 0)
+        .offset(x: animate ? 0 : 10)
+        .animation(.easeOut(duration: 0.4).delay(0.1 + Double(index) * 0.08), value: animate)
     }
 
     private func formatValue(_ v: Double) -> String {
@@ -64,15 +97,33 @@ private struct DriverRow: View {
 
 private struct ImportanceBar: View {
     let importance: Double
+    let animate: Bool
+    let delay: Double
+
+    private var intensity: Double { min(1.0, importance * 10) }
+
+    private var color: Color {
+        if intensity > 0.75 {
+            return Color(red: 0.957, green: 0.263, blue: 0.212) // #F44336
+        } else if intensity > 0.5 {
+            return Color(red: 1.000, green: 0.596, blue: 0.000) // #FF9800
+        } else if intensity > 0.25 {
+            return Color(red: 1.000, green: 0.922, blue: 0.231) // #FFEB3B
+        } else {
+            return Color(red: 0.298, green: 0.686, blue: 0.314) // #4CAF50
+        }
+    }
 
     var body: some View {
         GeometryReader { geo in
             ZStack(alignment: .leading) {
-                RoundedRectangle(cornerRadius: 3)
-                    .fill(Color.gray.opacity(0.2))
-                RoundedRectangle(cornerRadius: 3)
-                    .fill(Color.blue)
-                    .frame(width: geo.size.width * min(1.0, importance * 10))
+                Capsule()
+                    .fill(.white.opacity(0.08))
+                Capsule()
+                    .fill(color)
+                    .frame(width: animate ? geo.size.width * intensity : 0)
+                    .shadow(color: color.opacity(0.45), radius: 3)
+                    .animation(.easeOut(duration: 0.7).delay(delay), value: animate)
             }
         }
     }
