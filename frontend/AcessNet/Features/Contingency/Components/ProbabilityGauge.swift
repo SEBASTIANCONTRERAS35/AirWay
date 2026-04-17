@@ -15,6 +15,10 @@ struct ProbabilityGauge: View {
     let horizonHours: Int
 
     @State private var animatedProbability: Double = 0
+    @State private var displayPercent: Int = 0
+    @State private var animateRing: Bool = false
+    @State private var pulseHalo: Bool = false
+    @State private var animateContent: Bool = false
 
     private var level: ProbabilityLevel {
         switch probability {
@@ -27,60 +31,104 @@ struct ProbabilityGauge: View {
 
     private var color: Color {
         switch level {
-        case .low:      return .green
-        case .moderate: return .yellow
-        case .high:     return .orange
-        case .veryHigh: return .red
+        case .low:      return Color(red: 0.298, green: 0.686, blue: 0.314) // #4CAF50
+        case .moderate: return Color(red: 1.000, green: 0.922, blue: 0.231) // #FFEB3B
+        case .high:     return Color(red: 1.000, green: 0.596, blue: 0.000) // #FF9800
+        case .veryHigh: return Color(red: 0.957, green: 0.263, blue: 0.212) // #F44336
         }
     }
 
     var body: some View {
         ZStack {
-            // Fondo
+            // Pulsing radial halo
             Circle()
-                .stroke(Color.gray.opacity(0.15), lineWidth: 22)
+                .fill(
+                    RadialGradient(
+                        colors: [color.opacity(0.35), .clear],
+                        center: .center,
+                        startRadius: 30,
+                        endRadius: 160
+                    )
+                )
+                .scaleEffect(pulseHalo ? 1.08 : 0.9)
+                .opacity(pulseHalo ? 0.9 : 0.45)
+                .blur(radius: 14)
+                .animation(.easeInOut(duration: 2.4).repeatForever(autoreverses: true), value: pulseHalo)
 
-            // Arco de probabilidad
+            // Background ring
+            Circle()
+                .stroke(Color.white.opacity(0.06), lineWidth: 22)
+
+            // Probability arc — solid color
             Circle()
                 .trim(from: 0, to: CGFloat(animatedProbability))
-                .stroke(
-                    AngularGradient(
-                        colors: [color.opacity(0.6), color],
-                        center: .center
-                    ),
-                    style: StrokeStyle(lineWidth: 22, lineCap: .round)
-                )
+                .stroke(color, style: StrokeStyle(lineWidth: 22, lineCap: .round))
                 .rotationEffect(.degrees(-90))
-                .animation(.spring(response: 1.2, dampingFraction: 0.7), value: animatedProbability)
+                .shadow(color: color.opacity(0.6), radius: animateRing ? 14 : 0)
 
-            // Centro
+            // Center content
             VStack(spacing: 4) {
-                Text("\(Int(round(probability * 100)))%")
-                    .font(.system(size: 62, weight: .bold, design: .rounded))
+                Text("\(displayPercent)%")
+                    .font(.system(size: 64, weight: .heavy, design: .rounded))
                     .foregroundColor(color)
+                    .contentTransition(.numericText())
 
                 Text(level.label.uppercased())
-                    .font(.caption.bold())
-                    .tracking(2)
-                    .foregroundColor(color.opacity(0.85))
+                    .font(.system(size: 10, weight: .heavy))
+                    .tracking(2.4)
+                    .foregroundColor(color.opacity(0.95))
 
-                Text("prob. Fase 1 en \(horizonHours) h")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                Text("prob. Fase 1 · \(horizonHours)h")
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundColor(.white.opacity(0.45))
 
                 if let lo = ci80Lower, let hi = ci80Upper {
-                    Text("O₃ esperado: \(Int(round(o3ExpectedPpb))) ppb [\(Int(round(lo))) – \(Int(round(hi)))]")
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
-                        .padding(.top, 2)
+                    HStack(spacing: 4) {
+                        Text("O₃")
+                            .font(.system(size: 9, weight: .heavy))
+                            .foregroundColor(.white.opacity(0.4))
+                        Text("\(Int(round(o3ExpectedPpb))) ppb")
+                            .font(.system(size: 10, weight: .bold, design: .rounded))
+                            .foregroundColor(.white.opacity(0.8))
+                        Text("[\(Int(round(lo))) – \(Int(round(hi)))]")
+                            .font(.system(size: 9))
+                            .foregroundColor(.white.opacity(0.45))
+                    }
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(Capsule().fill(.white.opacity(0.06)))
+                    .padding(.top, 4)
                 }
             }
+            .opacity(animateContent ? 1 : 0)
+            .scaleEffect(animateContent ? 1 : 0.8)
+            .animation(.spring(response: 0.5, dampingFraction: 0.75).delay(0.4), value: animateContent)
         }
-        .onAppear {
+        .onAppear { triggerAnimations() }
+        .onChange(of: probability) { _, _ in
+            displayPercent = 0
+            animatedProbability = 0
+            triggerAnimations()
+        }
+    }
+
+    private func triggerAnimations() {
+        pulseHalo = true
+        animateContent = true
+        withAnimation(.spring(response: 1.3, dampingFraction: 0.75).delay(0.2)) {
             animatedProbability = probability
+            animateRing = true
         }
-        .onChange(of: probability) { _, newValue in
-            animatedProbability = newValue
+        // Count-up percentage
+        let target = Int(round(probability * 100))
+        let steps = max(target, 1)
+        let duration = 1.1
+        for i in 0...steps {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25 + duration * Double(i) / Double(steps)) {
+                withAnimation(.linear(duration: 0.02)) {
+                    displayPercent = i
+                }
+            }
         }
     }
 }

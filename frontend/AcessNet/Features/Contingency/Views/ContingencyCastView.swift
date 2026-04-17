@@ -10,6 +10,10 @@ import SwiftUI
 
 struct ContingencyCastView: View {
 
+    // MARK: - Environment
+
+    @ObservedObject private var appSettings = AppSettings.shared
+
     // MARK: - State
 
     @State private var response: ContingencyForecastResponse?
@@ -19,7 +23,13 @@ struct ContingencyCastView: View {
     @State private var naturalExplanation: String = ""
     @State private var isGeneratingExplanation = false
 
+    @State private var headerAppear: Bool = false
+
     @AppStorage("user_hologram") private var userHologram: String = ""
+
+    private var activeWeather: WeatherCondition {
+        appSettings.weatherOverride ?? .overcast
+    }
 
     // MARK: - Derived
 
@@ -30,74 +40,122 @@ struct ContingencyCastView: View {
     // MARK: - Body
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 20) {
-                header
+        ZStack {
+            backgroundView
 
-                if isLoading {
-                    ProgressView("Calculando pronóstico...")
-                        .padding(.vertical, 40)
-                } else if let error = errorMessage {
-                    errorView(error)
-                } else if let selected = selectedForecast {
-                    ProbabilityGauge(
-                        probability: selected.probFase1O3,
-                        ci80Lower: selected.o3Ci80Ppb.first,
-                        ci80Upper: selected.o3Ci80Ppb.last,
-                        o3ExpectedPpb: selected.o3ExpectedPpb,
-                        horizonHours: selected.horizonH
-                    )
-                    .frame(height: 240)
-                    .padding(.horizontal)
+            ScrollView {
+                VStack(spacing: 20) {
+                    header
+                        .opacity(headerAppear ? 1 : 0)
+                        .offset(y: headerAppear ? 0 : -10)
+                        .animation(.easeOut(duration: 0.45), value: headerAppear)
 
-                    horizonSelector
-
-                    if !naturalExplanation.isEmpty {
-                        explanationCard
-                    } else if isGeneratingExplanation {
-                        HStack {
-                            ProgressView().scaleEffect(0.7)
-                            Text("Generando explicación...").font(.caption)
-                        }
-                    }
-
-                    if !selected.recommendations.isEmpty {
-                        RecommendationsPanel(
-                            recommendations: selected.recommendations,
-                            probabilityLevel: selected.probabilityLevel
+                    if isLoading {
+                        loadingView
+                    } else if let error = errorMessage {
+                        errorView(error)
+                    } else if let selected = selectedForecast {
+                        ProbabilityGauge(
+                            probability: selected.probFase1O3,
+                            ci80Lower: selected.o3Ci80Ppb.first,
+                            ci80Upper: selected.o3Ci80Ppb.last,
+                            o3ExpectedPpb: selected.o3ExpectedPpb,
+                            horizonHours: selected.horizonH
                         )
+                        .frame(height: 260)
                         .padding(.horizontal)
-                    }
 
-                    if !selected.topDrivers.isEmpty {
-                        DriversPanel(drivers: selected.topDrivers)
+                        horizonSelector
+
+                        if !naturalExplanation.isEmpty {
+                            explanationCard
+                        } else if isGeneratingExplanation {
+                            explanationLoading
+                        }
+
+                        if !selected.recommendations.isEmpty {
+                            RecommendationsPanel(
+                                recommendations: selected.recommendations,
+                                probabilityLevel: selected.probabilityLevel
+                            )
                             .padding(.horizontal)
-                    }
+                        }
 
-                    disclaimerView
+                        if !selected.topDrivers.isEmpty {
+                            DriversPanel(drivers: selected.topDrivers)
+                                .padding(.horizontal)
+                        }
+
+                        disclaimerView
+                    }
                 }
+                .padding(.vertical, 12)
             }
-            .padding(.vertical)
         }
         .navigationTitle("ContingencyCast")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbarColorScheme(.dark, for: .navigationBar)
         .task {
             await loadForecast()
         }
         .refreshable {
             await loadForecast()
         }
+        .onAppear { headerAppear = true }
+    }
+
+    // MARK: - Background
+
+    private var backgroundView: some View {
+        WeatherBackground(condition: activeWeather)
+            .ignoresSafeArea()
     }
 
     // MARK: - Sub-views
 
     private var header: some View {
-        VStack(spacing: 4) {
-            Text("Probabilidad de contingencia")
-                .font(.headline)
-            Text("ZMVM · Fase 1 Ozono")
-                .font(.caption)
-                .foregroundColor(.secondary)
+        VStack(spacing: 6) {
+            HStack(spacing: 8) {
+                ZStack {
+                    Circle()
+                        .fill(
+                            LinearGradient(
+                                colors: [Color.orange.opacity(0.4), Color.red.opacity(0.3)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(width: 28, height: 28)
+                    Image(systemName: "wind.circle.fill")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundColor(.white)
+                }
+                Text("CONTINGENCY CAST")
+                    .font(.system(size: 11, weight: .heavy))
+                    .foregroundColor(.white.opacity(0.6))
+                    .tracking(2.2)
+            }
+
+            Text("Probabilidad de Contingencia")
+                .font(.system(size: 20, weight: .bold, design: .rounded))
+                .foregroundStyle(
+                    LinearGradient(colors: [.white, .white.opacity(0.75)], startPoint: .top, endPoint: .bottom)
+                )
+
+            HStack(spacing: 4) {
+                Image(systemName: "location.fill")
+                    .font(.system(size: 9))
+                Text("ZMVM")
+                    .font(.system(size: 10, weight: .semibold))
+                Text("·")
+                    .font(.system(size: 10))
+                Text("Fase 1 Ozono")
+                    .font(.system(size: 10, weight: .medium))
+            }
+            .foregroundColor(.white.opacity(0.55))
+            .padding(.horizontal, 10)
+            .padding(.vertical, 4)
+            .background(Capsule().fill(.white.opacity(0.06)))
         }
     }
 
@@ -105,20 +163,12 @@ struct ContingencyCastView: View {
         HStack(spacing: 10) {
             ForEach(response?.forecasts ?? []) { forecast in
                 Button {
-                    withAnimation(.spring()) {
+                    withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
                         selectedHorizon = forecast.horizonH
                     }
+                    UIImpactFeedbackGenerator(style: .soft).impactOccurred()
                 } label: {
-                    HorizonCard(forecast: forecast)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 16)
-                                .stroke(
-                                    selectedHorizon == forecast.horizonH
-                                        ? Color.accentColor
-                                        : Color.clear,
-                                    lineWidth: 2
-                                )
-                        )
+                    HorizonCard(forecast: forecast, isSelected: selectedHorizon == forecast.horizonH)
                 }
                 .buttonStyle(.plain)
             }
@@ -127,53 +177,131 @@ struct ContingencyCastView: View {
     }
 
     private var explanationCard: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Image(systemName: "sparkles")
-                    .foregroundColor(.purple)
-                Text("Explicación")
-                    .font(.headline)
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 10) {
+                ZStack {
+                    Circle()
+                        .fill(Color.white.opacity(0.1))
+                        .frame(width: 32, height: 32)
+                    Image(systemName: "text.bubble.fill")
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundColor(.white.opacity(0.85))
+                }
+
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("Explicación")
+                        .font(.system(size: 14, weight: .heavy))
+                        .foregroundColor(.white)
+                    Text("Análisis del pronóstico")
+                        .font(.system(size: 9, weight: .medium))
+                        .foregroundColor(.white.opacity(0.5))
+                        .textCase(.uppercase)
+                        .tracking(1.0)
+                }
             }
+
             Text(naturalExplanation)
-                .font(.subheadline)
-                .foregroundColor(.primary.opacity(0.85))
+                .font(.system(size: 13))
+                .foregroundColor(.white.opacity(0.85))
+                .lineSpacing(3)
                 .fixedSize(horizontal: false, vertical: true)
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
-            RoundedRectangle(cornerRadius: 16)
-                .fill(.ultraThinMaterial)
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(Color.white.opacity(0.05))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                )
         )
         .padding(.horizontal)
+        .transition(.asymmetric(
+            insertion: .opacity.combined(with: .offset(y: 8)),
+            removal: .opacity
+        ))
+    }
+
+    private var explanationLoading: some View {
+        HStack(spacing: 8) {
+            ProgressView().scaleEffect(0.7).tint(.white.opacity(0.7))
+            Text("Generando explicación…")
+                .font(.system(size: 11, weight: .medium))
+                .foregroundColor(.white.opacity(0.55))
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(Capsule().fill(.white.opacity(0.06)))
     }
 
     private var disclaimerView: some View {
         Text(response?.disclaimer ?? "")
-            .font(.caption2)
-            .foregroundColor(.secondary)
+            .font(.system(size: 10))
+            .foregroundColor(.white.opacity(0.35))
             .multilineTextAlignment(.center)
             .padding(.horizontal, 30)
-            .padding(.top, 10)
+            .padding(.top, 6)
+            .padding(.bottom, 16)
+    }
+
+    private var loadingView: some View {
+        VStack(spacing: 14) {
+            ProgressView().tint(.white)
+            Text("Calculando pronóstico…")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundColor(.white.opacity(0.6))
+        }
+        .padding(.vertical, 60)
     }
 
     private func errorView(_ message: String) -> some View {
-        VStack(spacing: 12) {
-            Image(systemName: "exclamationmark.triangle.fill")
-                .font(.largeTitle)
-                .foregroundColor(.orange)
-            Text("No pudimos obtener el pronóstico")
-                .font(.headline)
-            Text(message)
-                .font(.subheadline)
-                .foregroundColor(.secondary)
-                .multilineTextAlignment(.center)
-            Button("Reintentar") {
-                Task { await loadForecast() }
+        VStack(spacing: 14) {
+            ZStack {
+                Circle()
+                    .fill(Color.orange.opacity(0.2))
+                    .frame(width: 60, height: 60)
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .font(.system(size: 26, weight: .semibold))
+                    .foregroundColor(.orange)
             }
-            .buttonStyle(.borderedProminent)
+            .shadow(color: .orange.opacity(0.4), radius: 14)
+
+            Text("No pudimos obtener el pronóstico")
+                .font(.system(size: 15, weight: .bold))
+                .foregroundColor(.white)
+            Text(message)
+                .font(.system(size: 12))
+                .foregroundColor(.white.opacity(0.55))
+                .multilineTextAlignment(.center)
+
+            Button {
+                Task { await loadForecast() }
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "arrow.clockwise")
+                        .font(.system(size: 11, weight: .bold))
+                    Text("Reintentar")
+                        .font(.system(size: 12, weight: .heavy))
+                }
+                .foregroundColor(.white)
+                .padding(.horizontal, 18)
+                .padding(.vertical, 10)
+                .background(
+                    Capsule().fill(
+                        LinearGradient(
+                            colors: [Color.orange, Color.red],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+                )
+                .shadow(color: .orange.opacity(0.5), radius: 8)
+            }
+            .padding(.top, 4)
         }
-        .padding(40)
+        .padding(.horizontal, 36)
+        .padding(.vertical, 40)
     }
 
     // MARK: - Actions
