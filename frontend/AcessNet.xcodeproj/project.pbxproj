@@ -69,6 +69,7 @@
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
+				Features/HealthMenu/Resources/README.md,
 			);
 			target = 2621969B2E80F60C007E3787 /* AirWay */;
 		};

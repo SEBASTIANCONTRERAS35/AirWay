@@ -1,89 +1,135 @@
-# HealthMenu · BioDigital HumanKit
+# HealthMenu · Diagnóstico corporal tipo MGS3
 
-Menú tipo "Cure" (Metal Gear Solid 3) que muestra un modelo anatómico 3D del
-cuerpo del usuario con los órganos afectados por contaminación/hábitos
-resaltados, más una lista de tratamientos accionables.
-
-Se navega desde `BodyScanHubView` (modo `.saved`, solo cuando hay un escaneo
-USDZ guardado).
+Menú que muestra un modelo anatómico 3D del cuerpo del usuario con los
+órganos afectados por contaminación resaltados, más una lista de
+tratamientos. Se abre desde `BodyScanHubView` en modo `.saved` (solo si hay
+un escaneo LiDAR guardado).
 
 ---
 
-## 1. Agregar el paquete HumanKit (Swift Package Manager)
+## Arquitectura actual (modo por defecto)
 
-1. En Xcode: `File → Add Package Dependencies…`
-2. URL: `https://github.com/biodigital-inc/HumanKit.git`
-3. Versión: `Up to Next Major Version` desde **164.3** (o superior disponible).
-4. Target: `AcessNet`.
+**Sin dependencias externas.** El visor 3D es **`AnatomicalModelView`** —
+un wrapper SceneKit nativo que carga un USDZ del bundle, hace hit-testing
+para detectar qué órgano tocas, y pinta los órganos según el nivel de daño.
 
-## 2. Activar el SDK en código
+Mientras no agregues un USDZ anatómico al bundle, la app renderiza una
+**escena de respaldo** (torso translúcido + 6 esferas nombradas como
+órganos). Suficiente para probar el flujo completo.
 
-El wrapper `BioDigitalHumanView.swift` compila en modo placeholder por
-defecto. Para activar el SDK real:
+## Agregar el modelo USDZ real (recomendado)
 
-1. En Xcode: `AcessNet target → Build Settings → Swift Compiler - Custom Flags
-   → Active Compilation Conditions`.
-2. Añade `HAS_HUMANKIT` a Debug y Release.
+El wrapper busca un archivo llamado **`anatomy_body.usdz`** (o `.usd` /
+`.usda` / `.scn` / `.dae`) dentro del bundle.
 
-Mientras la flag no esté activa, el menú muestra un stub SceneKit con un
-mensaje de "SDK no enlazado". La app compila sin el paquete.
+### Opción A · Z-Anatomy (CC-BY-SA 4.0, más completo)
 
-## 3. Obtener y configurar la API key
-
-1. Crear cuenta en https://developer.biodigital.com
-2. Registrar una app con el Bundle ID **xyz.KOmbo.AirWay**.
-3. Copiar la API key y el API secret generados.
-4. En `frontend/`:
+1. Descargar `.fbx` desde [github.com/LluisV/Z-Anatomy](https://github.com/LluisV/Z-Anatomy)
+   (carpeta `Resources/Models/FBX`) o el Google Drive enlazado en el repo.
+2. Convertir a USDZ:
    ```bash
-   cp Secrets.example.xcconfig Secrets.xcconfig
+   # Requiere Reality Composer Pro (Xcode) instalado
+   xcrun usdz_converter input.fbx anatomy_body.usdz
    ```
-5. Editar `Secrets.xcconfig` y pegar las credenciales reales.
-6. En Xcode: `Project → Info → Configurations → Debug/Release → AcessNet`
-   asignar el archivo `Secrets` como configuration file.
-7. En el `Info.plist` del target añadir:
-   ```xml
-   <key>BIODIGITAL_API_KEY</key>
-   <string>$(BIODIGITAL_API_KEY)</string>
-   <key>BIODIGITAL_API_SECRET</key>
-   <string>$(BIODIGITAL_API_SECRET)</string>
-   ```
+   Si `usdz_converter` falla, usar **Reality Composer Pro**:
+   - Abrir Reality Composer Pro → File → Import → seleccionar `.fbx`.
+   - File → Export → USDZ → nombrar `anatomy_body.usdz`.
+3. Arrastrar `anatomy_body.usdz` al proyecto Xcode (Copy if needed ✅,
+   target AcessNet ✅).
 
-> ⚠️ `Secrets.xcconfig` está en `.gitignore`. Nunca lo commitees.
+### Opción B · Sketchfab (variedad CC0/CC-BY)
 
-## 4. App Transport Security
+1. Buscar en [sketchfab.com](https://sketchfab.com) con filtros:
+   `Downloadable` + `USDZ` + `Anatomy`.
+2. Modelos sugeridos (verificar licencia antes de usar):
+   - "Human Anatomy Lite" (~15 MB, órganos separados).
+   - "Human Body - Interactive Anatomy" (completo, CC-BY).
+3. Descargar el USDZ, renombrar a `anatomy_body.usdz`, arrastrar al
+   proyecto.
 
-El SDK BioDigital usa un loopback local para comunicarse con su webview
-interna. Puede ser necesario agregar al `Info.plist`:
+### Opción C · Apple AR Quick Look samples
 
-```xml
-<key>NSAppTransportSecurity</key>
-<dict>
-    <key>NSAllowsLocalNetworking</key>
-    <true/>
-</dict>
+Hay modelos de cuerpo humano disponibles en la galería oficial de Apple:
+https://developer.apple.com/augmented-reality/quick-look/
+
+### Verificar nombres de nodos del USDZ
+
+Para que los órganos se pinten y sean tap-able, los `SCNNode` internos del
+USDZ deben contener palabras clave reconocibles. `AnatomicalNodeMatcher`
+reconoce (case-insensitive, `contains`):
+
+| Órgano  | Patrones que matchean                                              |
+| ------- | ------------------------------------------------------------------ |
+| brain   | `brain`, `cerebrum`, `cerebellum`, `cerebro`                       |
+| lungs   | `lung`, `pulmon`, `respiratory`, `bronch`, `alveol`                |
+| heart   | `heart`, `cardiac`, `corazon`, `cardiovascular`                    |
+| throat  | `trachea`, `larynx`, `pharynx`, `throat`, `traquea`, `laringe`     |
+| nose    | `nose`, `nasal`, `sinus`, `nariz`                                  |
+| skin    | `skin`, `integumentary`, `piel`, `epiderm`                         |
+
+Para ver los nombres reales del USDZ descargado:
+
+```swift
+// Paste temporalmente en AnatomicalModelView.Coordinator.loadScene:
+scene.rootNode.enumerateHierarchy { node, _ in
+    if let name = node.name { print("🦴 node: \(name)") }
+}
 ```
 
-## 5. Validar object IDs reales del modelo
+Si ningún nodo matchea los patrones, extiende
+`AnatomicalNodeMatcher.patterns` con las palabras que sí usa tu asset.
 
-Los IDs usados en `BioDigitalOrganMapper.swift` son **placeholders**. El
-modelo por defecto cargado (`production/maleAdult/flu.json`) expone sus IDs
-reales a través del callback `objectPicked` del delegate.
+### Tap sin match → log automático
 
-Para descubrirlos en debug:
+Cuando el usuario toca un nodo que el matcher no reconoce, verás en consola:
 
-1. Corre la app con `HAS_HUMANKIT` activada.
-2. Toca cada órgano en el modelo 3D.
-3. Observa la consola: `🩺 BioDigital objectPicked (no mapeado): <id>`.
-4. Actualiza `BioDigitalOrganMapper.objectIds(for:)` con los IDs reales por
-   órgano.
+```
+🩺 anatomical tap (no mapeado): <nombre_del_nodo>
+```
 
-## 6. Qué está pendiente (iteraciones futuras)
+Usa esos logs para completar los patrones.
+
+---
+
+## Plan futuro — Integración BioDigital HumanKit (cuando haya API key)
+
+El wrapper alternativo `BioDigitalHumanView.swift` está preparado para
+activarse vía flag de compilación. Requiere:
+
+1. Subscription plan developer de BioDigital (ver trámite en
+   `BioDigitalConfig.swift`).
+2. Agregar el SPM: `https://github.com/biodigital-inc/HumanKit.git` (≥ 164.3).
+3. Activar **Active Compilation Conditions → `HAS_HUMANKIT`** en Build
+   Settings.
+4. Agregar `BIODIGITAL_API_KEY` y `BIODIGITAL_API_SECRET` vía
+   `Secrets.xcconfig` (ejemplo en `frontend/Secrets.example.xcconfig`).
+5. Intercambiar `AnatomicalModelView` por `BioDigitalHumanView` en
+   `HealthMenuView.swift` (una línea).
+
+Mientras no se active la flag, ese archivo compila en modo stub SceneKit.
+
+---
+
+## Qué NO está conectado aún (iteraciones futuras)
 
 Marcados con `// TODO` en el código:
 
-- Motor real de cálculo de daño por contaminación.
-- Integración con APIs de calidad del aire (IQAir / SEDEMA / OpenWeather).
-- HealthKit para consumo real de datos del usuario (pasos, frecuencia
-  cardíaca, etc.).
-- Notificaciones push contextuales cuando el AQI cambia.
-- Selección dinámica de modelo BioDigital según perfil del usuario.
+- **Motor real de daño** por contaminación (ver `BodyHealthState.cdmxHighPollutionMock`).
+- **APIs de calidad del aire** reales (IQAir / SEDEMA / OpenWeather) para
+  el badge AQI del header.
+- **HealthKit** para datos del usuario (pasos, frecuencia cardíaca, etc.).
+- **Notificaciones push** contextuales al cambiar el AQI.
+- **Navegación a detalle** completo de cada tratamiento.
+
+---
+
+## Flujo de usuario
+
+1. Usuario escanea su cuerpo con LiDAR (tab Body → Escanear) → obtiene USDZ.
+2. Va al modo **Modelo** del hub.
+3. Toca **"Ver estado de tu cuerpo"** (CTA gradient naranja-rojo abajo del
+   modelo).
+4. Se abre `HealthMenuView` a pantalla completa.
+5. Ve el AQI de CDMX, el modelo anatómico con órganos coloreados y los
+   tratamientos sugeridos.
+6. Toca un órgano → sheet con detalle del daño + condiciones activas.

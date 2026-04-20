@@ -142,6 +142,7 @@ struct HealthMenuView: View {
                     bodyState: viewModel.bodyState,
                     onModelReady: viewModel.handleModelReady,
                     onLoadError: viewModel.handleLoadError,
+                    onFallbackNotice: viewModel.handleFallbackNotice,
                     onOrganPicked: viewModel.didSelectOrgan
                 )
                 .id(modelContainerRef)

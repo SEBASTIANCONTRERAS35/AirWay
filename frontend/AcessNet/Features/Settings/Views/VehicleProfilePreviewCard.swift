@@ -12,6 +12,7 @@ import Combine
 struct VehicleProfilePreviewCard: View {
     let onExpand: () -> Void
     let onAdd: () -> Void
+    var onConnectOBD: (() -> Void)? = nil
 
     @StateObject private var service = VehicleProfileService.shared
     @Environment(\.weatherTheme) private var theme
@@ -37,6 +38,9 @@ struct VehicleProfilePreviewCard: View {
             if let active = active {
                 miniStage(for: active)
                 activeInfoRow(active)
+                if Vehicle3DAsset.forProfile(active) == .sedan, onConnectOBD != nil {
+                    hardwarePremiumSection
+                }
                 if !otherProfiles.isEmpty {
                     otherVehiclesCarousel
                 }
@@ -273,6 +277,129 @@ struct VehicleProfilePreviewCard: View {
                 .tracking(0.5)
                 .foregroundColor(.white.opacity(0.5))
         }
+    }
+
+    // MARK: - Hardware Premium (solo sedán)
+
+    private var hardwarePremiumSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .top, spacing: 10) {
+                ZStack {
+                    Circle()
+                        .fill(
+                            LinearGradient(
+                                colors: [Color(hex: "#22D3EE").opacity(0.45),
+                                         Color(hex: "#0E7490").opacity(0.15)],
+                                startPoint: .topLeading, endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(width: 38, height: 38)
+                    Circle()
+                        .stroke(Color(hex: "#22D3EE").opacity(0.5), lineWidth: 1)
+                        .frame(width: 38, height: 38)
+                    Image(systemName: "antenna.radiowaves.left.and.right")
+                        .font(.system(size: 15, weight: .heavy))
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [Color(hex: "#22D3EE"), Color(hex: "#06B6D4")],
+                                startPoint: .topLeading, endPoint: .bottomTrailing
+                            )
+                        )
+                }
+
+                VStack(alignment: .leading, spacing: 3) {
+                    HStack(spacing: 5) {
+                        Text("Hardware Premium")
+                            .font(.system(size: 13, weight: .heavy))
+                            .foregroundColor(.white)
+                        HStack(spacing: 3) {
+                            Image(systemName: "checkmark.seal.fill")
+                                .font(.system(size: 8, weight: .heavy))
+                            Text("COMPATIBLE")
+                                .font(.system(size: 8, weight: .heavy))
+                                .tracking(0.8)
+                        }
+                        .foregroundColor(Color(hex: "#22D3EE"))
+                        .padding(.horizontal, 5).padding(.vertical, 2)
+                        .background(Capsule().fill(Color(hex: "#22D3EE").opacity(0.14)))
+                        .overlay(Capsule().stroke(Color(hex: "#22D3EE").opacity(0.45), lineWidth: 1))
+                    }
+                    Text("OBD-II BLE · ELM327 · Vgate · OBDLink")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundColor(.white.opacity(0.6))
+                        .lineLimit(1)
+                    HStack(spacing: 6) {
+                        hwChip(icon: "gauge.open.with.lines.needle.33percent", label: "Velocidad")
+                        hwChip(icon: "waveform.path.ecg", label: "RPM")
+                        hwChip(icon: "fuelpump.fill", label: "L/hr")
+                    }
+                    .padding(.top, 2)
+                }
+                Spacer(minLength: 0)
+            }
+
+            Button(action: {
+                HapticFeedback.confirm()
+                onConnectOBD?()
+            }) {
+                HStack(spacing: 8) {
+                    Image(systemName: "dot.radiowaves.left.and.right")
+                        .font(.system(size: 13, weight: .heavy))
+                    Text("Buscar dongles BLE")
+                        .font(.system(size: 14, weight: .heavy))
+                    Spacer()
+                    Image(systemName: "arrow.right")
+                        .font(.system(size: 11, weight: .heavy))
+                }
+                .foregroundColor(.white)
+                .padding(.horizontal, 14).padding(.vertical, 12)
+                .background(
+                    LinearGradient(
+                        colors: [Color(hex: "#22D3EE"), Color(hex: "#0E7490")],
+                        startPoint: .leading, endPoint: .trailing
+                    )
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
+                .shadow(color: Color(hex: "#22D3EE").opacity(0.45), radius: 10, y: 4)
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(12)
+        .background(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(
+                    LinearGradient(
+                        colors: [Color(hex: "#22D3EE").opacity(0.12),
+                                 Color(hex: "#06B6D4").opacity(0.04)],
+                        startPoint: .topLeading, endPoint: .bottomTrailing
+                    )
+                )
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(
+                    LinearGradient(
+                        colors: [Color(hex: "#22D3EE").opacity(0.5),
+                                 Color(hex: "#0E7490").opacity(0.15)],
+                        startPoint: .topLeading, endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 1.2
+                )
+        )
+    }
+
+    private func hwChip(icon: String, label: String) -> some View {
+        HStack(spacing: 3) {
+            Image(systemName: icon)
+                .font(.system(size: 8, weight: .heavy))
+            Text(label)
+                .font(.system(size: 9, weight: .heavy))
+                .tracking(0.3)
+        }
+        .foregroundColor(.white.opacity(0.75))
+        .padding(.horizontal, 6).padding(.vertical, 3)
+        .background(Capsule().fill(.white.opacity(0.06)))
+        .overlay(Capsule().stroke(.white.opacity(0.1), lineWidth: 0.8))
     }
 
     // MARK: - Other Vehicles Carousel
