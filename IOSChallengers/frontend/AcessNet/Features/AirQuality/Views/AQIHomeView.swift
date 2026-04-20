@@ -10,12 +10,15 @@ import CoreLocation
 
 struct AQIHomeView: View {
     @Binding var showBusinessPulse: Bool
+    @EnvironmentObject var appSettings: AppSettings
     @State private var airQualityData: AirQualityData = .sample
     @State private var selectedForecastTab: ForecastTab = .hourly
     @State private var showSearchModal = false
     @State private var searchText = ""
     @State private var showARView = false
     @State private var isLoadingAQI: Bool = false
+
+    private var theme: WeatherSimMode { appSettings.weatherSimMode }
 
     enum ForecastTab {
         case hourly
@@ -29,16 +32,21 @@ struct AQIHomeView: View {
     var body: some View {
         NavigationView {
             ZStack {
-                // Background gradient - Primary to Secondary
-                LinearGradient(
-                    colors: [
-                        Color("Primary"),
-                        Color("Secondary")
-                    ],
-                    startPoint: .top,
-                    endPoint: .bottom
+                // Fondo según Weather Simulation (Settings → Weather Simulation)
+                theme.backgroundGradient
+                    .ignoresSafeArea()
+                    .animation(.easeInOut(duration: 0.45), value: theme)
+
+                // Halo sutil con el accent del theme
+                RadialGradient(
+                    colors: [theme.accent.opacity(0.22), .clear],
+                    center: .topTrailing,
+                    startRadius: 40,
+                    endRadius: 360
                 )
                 .ignoresSafeArea()
+                .allowsHitTesting(false)
+                .animation(.easeInOut(duration: 0.45), value: theme)
 
                 ScrollView(showsIndicators: false) {
                     VStack(spacing: 20) {
@@ -83,25 +91,25 @@ struct AQIHomeView: View {
                 VStack(alignment: .leading, spacing: 6) {
                     HStack(spacing: 6) {
                         Image(systemName: "location.fill")
-                            .foregroundColor(.white)
+                            .foregroundColor(.awAccent)
                             .font(.subheadline)
 
                         Text(airQualityData.location)
                             .font(.title3.bold())
-                            .foregroundColor(.white)
+                            .foregroundColor(.awInk)
 
                         Image(systemName: "arrow.up.right.circle.fill")
-                            .foregroundColor(.white.opacity(0.8))
+                            .foregroundColor(.awInkSoft)
                             .font(.subheadline)
                     }
 
                     Text(airQualityData.city)
                         .font(.subheadline)
-                        .foregroundColor(.white.opacity(0.9))
+                        .foregroundColor(.awInkSoft)
 
                     Text("Nearest Monitor : \(String(format: "%.2f", airQualityData.distance)) Km")
                         .font(.caption)
-                        .foregroundColor(.white.opacity(0.8))
+                        .foregroundColor(.awInkMuted)
                 }
 
                 Spacer()
@@ -112,14 +120,14 @@ struct AQIHomeView: View {
                 }) {
                     Image(systemName: "magnifyingglass")
                         .font(.title3)
-                        .foregroundColor(.white)
+                        .foregroundColor(.awInk)
                         .frame(width: 40, height: 40)
                         .background(
                             Circle()
-                                .fill(.white.opacity(0.2))
+                                .fill(Color.awSurface)
                                 .overlay(
                                     Circle()
-                                        .stroke(.white.opacity(0.3), lineWidth: 1)
+                                        .stroke(Color.awBorderStrong, lineWidth: 1)
                                 )
                         )
                 }
@@ -227,19 +235,20 @@ struct AQIHomeView: View {
                     VStack(alignment: .leading, spacing: 8) {
                         HStack(spacing: 6) {
                             Circle()
-                                .fill(.red)
+                                .fill(Color.awAccent)
                                 .frame(width: 10, height: 10)
-                                .shadow(color: .red, radius: 4)
+                                .shadow(color: Color.awAccent.opacity(0.8), radius: 4)
 
                             Text("Live AQI")
                                 .font(.subheadline.bold())
-                                .foregroundColor(.white)
+                                .foregroundColor(.awInkSoft)
+                                .tracking(0.6)
                         }
 
                         Text("\(airQualityData.aqi)")
                             .font(.system(size: 90, weight: .heavy))
-                            .foregroundColor(.white)
-                            .shadow(color: .black.opacity(0.3), radius: 4, x: 0, y: 2)
+                            .foregroundColor(.awInk)
+                            .shadow(color: .black.opacity(0.4), radius: 6, x: 0, y: 2)
                     }
 
                     Spacer()
@@ -247,21 +256,21 @@ struct AQIHomeView: View {
                     VStack(alignment: .trailing, spacing: 10) {
                         Text("Air Quality is")
                             .font(.subheadline)
-                            .foregroundColor(.white.opacity(0.95))
+                            .foregroundColor(.awInkSoft)
 
                         Text(airQualityData.qualityLevel.rawValue)
                             .font(.title2.bold())
-                            .foregroundColor(.white)
+                            .foregroundColor(.awInk)
                             .padding(.horizontal, 20)
                             .padding(.vertical, 10)
                             .background(
                                 RoundedRectangle(cornerRadius: 18)
-                                    .fill(Color(hex: airQualityData.qualityLevel.color).opacity(0.8))
+                                    .fill(Color(hex: airQualityData.qualityLevel.color).opacity(0.85))
                                     .overlay(
                                         RoundedRectangle(cornerRadius: 18)
-                                            .stroke(.white.opacity(0.3), lineWidth: 1.5)
+                                            .stroke(Color.awBorderStrong, lineWidth: 1.5)
                                     )
-                                    .shadow(color: .black.opacity(0.3), radius: 8, x: 0, y: 4)
+                                    .shadow(color: Color(hex: airQualityData.qualityLevel.color).opacity(0.35), radius: 10, x: 0, y: 4)
                             )
                     }
                 }
@@ -274,22 +283,22 @@ struct AQIHomeView: View {
                     VStack(alignment: .leading, spacing: 6) {
                         Text("PM2.5")
                             .font(.caption)
-                            .foregroundColor(.white.opacity(0.7))
+                            .foregroundColor(.awInkMuted)
 
                         Text("\(Int(airQualityData.pm25)) μg/m³")
                             .font(.subheadline.bold())
-                            .foregroundColor(.white)
+                            .foregroundColor(.awInk)
                     }
 
                     // PM10
                     VStack(alignment: .leading, spacing: 6) {
                         Text("PM10")
                             .font(.caption)
-                            .foregroundColor(.white.opacity(0.7))
+                            .foregroundColor(.awInkMuted)
 
                         Text("\(Int(airQualityData.pm10)) μg/m³")
                             .font(.subheadline.bold())
-                            .foregroundColor(.white)
+                            .foregroundColor(.awInk)
                     }
 
                     Spacer()
@@ -305,12 +314,12 @@ struct AQIHomeView: View {
             }
             .background(
                 RoundedRectangle(cornerRadius: 20)
-                    .fill(.ultraThinMaterial.opacity(0.3))
+                    .fill(Color.awSurface)
                     .overlay(
                         RoundedRectangle(cornerRadius: 20)
-                            .stroke(.white.opacity(0.2), lineWidth: 1)
+                            .stroke(Color.awBorder, lineWidth: 1)
                     )
-                    .shadow(color: .black.opacity(0.2), radius: 10, x: 0, y: 5)
+                    .shadow(color: .black.opacity(0.35), radius: 16, x: 0, y: 8)
             )
         }
         .padding(.horizontal)
@@ -321,60 +330,50 @@ struct AQIHomeView: View {
             showARView = true
         }) {
             HStack(spacing: 16) {
-                // AR Icon
+                // AR Icon (accent gradient para reforzar la marca)
                 ZStack {
                     Circle()
                         .fill(
                             LinearGradient(
-                                colors: [.purple.opacity(0.8), .indigo.opacity(0.8)],
+                                colors: [Color.awAccent, Color.awPrimary],
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
                             )
                         )
                         .frame(width: 60, height: 60)
-                        .shadow(color: .purple.opacity(0.4), radius: 8, x: 0, y: 4)
+                        .shadow(color: Color.awAccent.opacity(0.45), radius: 10, x: 0, y: 4)
 
                     Image(systemName: "camera.metering.center.weighted")
                         .font(.system(size: 28, weight: .semibold))
-                        .foregroundColor(.white)
+                        .foregroundColor(.awInk)
                 }
 
                 // Text content
                 VStack(alignment: .leading, spacing: 4) {
                     Text("AR Air Quality")
                         .font(.headline)
-                        .foregroundColor(.white)
+                        .foregroundColor(.awInk)
 
                     Text("Visualize invisible PM2.5 particles")
                         .font(.subheadline)
-                        .foregroundColor(.white.opacity(0.8))
+                        .foregroundColor(.awInkSoft)
                 }
 
                 Spacer()
 
-                // Chevron
                 Image(systemName: "chevron.right")
                     .font(.title3)
-                    .foregroundColor(.white.opacity(0.6))
+                    .foregroundColor(.awInkMuted)
             }
             .padding()
             .background(
                 RoundedRectangle(cornerRadius: 16)
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                Color.purple.opacity(0.5),
-                                Color.indigo.opacity(0.5)
-                            ],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        )
-                    )
+                    .fill(Color.awSurface)
                     .overlay(
                         RoundedRectangle(cornerRadius: 16)
-                            .stroke(.white.opacity(0.2), lineWidth: 1)
+                            .stroke(Color.awAccent.opacity(0.35), lineWidth: 1)
                     )
-                    .shadow(color: .purple.opacity(0.3), radius: 12, x: 0, y: 6)
+                    .shadow(color: Color.awAccent.opacity(0.18), radius: 14, x: 0, y: 6)
             )
         }
         .padding(.horizontal)
@@ -414,7 +413,6 @@ struct AQIHomeView: View {
             // Weather info card
             VStack(spacing: 12) {
                 HStack(spacing: 0) {
-                    // Temperature
                     WeatherInfoItem(
                         icon: "cloud.fill",
                         value: "\(Int(airQualityData.temperature))°",
@@ -422,11 +420,8 @@ struct AQIHomeView: View {
                         label: airQualityData.weatherCondition.rawValue
                     )
 
-                    Divider()
-                        .frame(height: 60)
-                        .background(.white.opacity(0.2))
+                    Divider().frame(height: 60).background(Color.awBorder)
 
-                    // Humidity
                     WeatherInfoItem(
                         icon: "drop.fill",
                         value: "\(airQualityData.humidity)",
@@ -434,11 +429,8 @@ struct AQIHomeView: View {
                         label: "Humidity"
                     )
 
-                    Divider()
-                        .frame(height: 60)
-                        .background(.white.opacity(0.2))
+                    Divider().frame(height: 60).background(Color.awBorder)
 
-                    // Wind
                     WeatherInfoItem(
                         icon: "wind",
                         value: "\(Int(airQualityData.windSpeed))",
@@ -446,11 +438,8 @@ struct AQIHomeView: View {
                         label: "Wind"
                     )
 
-                    Divider()
-                        .frame(height: 60)
-                        .background(.white.opacity(0.2))
+                    Divider().frame(height: 60).background(Color.awBorder)
 
-                    // UV Index
                     WeatherInfoItem(
                         icon: "sun.max.fill",
                         value: "\(airQualityData.uvIndex)",
@@ -460,20 +449,19 @@ struct AQIHomeView: View {
                 }
                 .padding(.vertical, 8)
 
-                // Last update
                 Text("Last Update:  \(airQualityData.timeAgo)")
                     .font(.caption)
-                    .foregroundColor(.white.opacity(0.8))
+                    .foregroundColor(.awInkMuted)
             }
             .padding()
             .background(
                 RoundedRectangle(cornerRadius: 20)
-                    .fill(.ultraThinMaterial.opacity(0.3))
+                    .fill(Color.awSurface)
                     .overlay(
                         RoundedRectangle(cornerRadius: 20)
-                            .stroke(.white.opacity(0.2), lineWidth: 1)
+                            .stroke(Color.awBorder, lineWidth: 1)
                     )
-                    .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 5)
+                    .shadow(color: .black.opacity(0.25), radius: 14, x: 0, y: 6)
             )
             .padding(.horizontal)
         }
@@ -483,7 +471,7 @@ struct AQIHomeView: View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Today's exposure")
                 .font(.title2.bold())
-                .foregroundColor(.white)
+                .foregroundColor(.awInk)
                 .padding(.horizontal)
 
             // Exposure Chart
@@ -507,7 +495,7 @@ struct AQIHomeView: View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Weather Forecast")
                 .font(.title3.bold())
-                .foregroundColor(.white)
+                .foregroundColor(.awInk)
                 .padding(.horizontal)
 
             // Tabs
@@ -638,11 +626,11 @@ struct DailyForecastCard: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(forecast.dayName)
                     .font(.headline)
-                    .foregroundColor(.white)
+                    .foregroundColor(.awInk)
 
                 Text(formatDate(forecast.date))
                     .font(.caption)
-                    .foregroundColor(.white.opacity(0.7))
+                    .foregroundColor(.awInkMuted)
             }
             .frame(width: 85, alignment: .leading)
 
@@ -650,20 +638,20 @@ struct DailyForecastCard: View {
             VStack(spacing: 4) {
                 Text("\(forecast.aqi)")
                     .font(.title2.bold())
-                    .foregroundColor(.white)
+                    .foregroundColor(.awInk)
 
                 Text("AQI")
                     .font(.caption2)
-                    .foregroundColor(.white.opacity(0.8))
+                    .foregroundColor(.awInkSoft)
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 10)
             .background(
                 RoundedRectangle(cornerRadius: 12)
-                    .fill(forecast.aqiColor.opacity(0.3))
+                    .fill(forecast.aqiColor.opacity(0.25))
                     .overlay(
                         RoundedRectangle(cornerRadius: 12)
-                            .stroke(forecast.aqiColor, lineWidth: 2)
+                            .stroke(forecast.aqiColor, lineWidth: 1.5)
                     )
             )
 
@@ -674,35 +662,34 @@ struct DailyForecastCard: View {
                 VStack(alignment: .trailing, spacing: 4) {
                     Text(forecast.weatherDescription)
                         .font(.subheadline)
-                        .foregroundColor(.white)
+                        .foregroundColor(.awInk)
 
                     Text("\(forecast.temp)°C")
                         .font(.caption)
-                        .foregroundColor(.white.opacity(0.8))
+                        .foregroundColor(.awInkSoft)
                 }
 
                 Image(systemName: forecast.weatherIcon)
                     .font(.title2)
-                    .foregroundColor(.white)
+                    .foregroundColor(.awInk)
                     .symbolRenderingMode(.multicolor)
                     .frame(width: 35)
             }
 
-            // Chevron
             Image(systemName: "chevron.right")
                 .font(.caption)
-                .foregroundColor(.white.opacity(0.4))
+                .foregroundColor(.awInkMuted)
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 16)
         .background(
             RoundedRectangle(cornerRadius: 20)
-                .fill(.ultraThinMaterial.opacity(0.3))
+                .fill(Color.awSurface)
                 .overlay(
                     RoundedRectangle(cornerRadius: 20)
-                        .stroke(.white.opacity(0.2), lineWidth: 1)
+                        .stroke(Color.awBorder, lineWidth: 1)
                 )
-                .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 5)
+                .shadow(color: .black.opacity(0.25), radius: 12, x: 0, y: 5)
         )
     }
 
@@ -803,29 +790,17 @@ struct AQIScaleBar: View {
         VStack(spacing: 8) {
             // Scale labels
             HStack {
-                Text("Good")
-                    .font(.caption2)
-                    .foregroundColor(.white)
+                Text("Good").font(.caption2).foregroundColor(.awInkSoft)
                 Spacer()
-                Text("Moderate")
-                    .font(.caption2)
-                    .foregroundColor(.white)
+                Text("Moderate").font(.caption2).foregroundColor(.awInkSoft)
                 Spacer()
-                Text("Poor")
-                    .font(.caption2)
-                    .foregroundColor(.white)
+                Text("Poor").font(.caption2).foregroundColor(.awInkSoft)
                 Spacer()
-                Text("Unhealthy")
-                    .font(.caption2)
-                    .foregroundColor(.white)
+                Text("Unhealthy").font(.caption2).foregroundColor(.awInkSoft)
                 Spacer()
-                Text("Severe")
-                    .font(.caption2)
-                    .foregroundColor(.white)
+                Text("Severe").font(.caption2).foregroundColor(.awInkSoft)
                 Spacer()
-                Text("Hazardous")
-                    .font(.caption2)
-                    .foregroundColor(.white)
+                Text("Hazardous").font(.caption2).foregroundColor(.awInkSoft)
             }
 
             // Scale bar
@@ -861,7 +836,7 @@ struct AQIScaleBar: View {
                 ForEach([0, 50, 100, 150, 200, 301], id: \.self) { number in
                     Text("\(number)")
                         .font(.caption2)
-                        .foregroundColor(.white.opacity(0.8))
+                        .foregroundColor(.awInkMuted)
                     if number != 301 {
                         Spacer()
                     }
@@ -869,7 +844,7 @@ struct AQIScaleBar: View {
 
                 Text("301+")
                     .font(.caption2)
-                    .foregroundColor(.white.opacity(0.8))
+                    .foregroundColor(.awInkMuted)
             }
         }
     }
@@ -885,23 +860,23 @@ struct WeatherInfoItem: View {
         VStack(spacing: 8) {
             Image(systemName: icon)
                 .font(.title2)
-                .foregroundColor(.white)
+                .foregroundColor(.awAccent)
 
             HStack(alignment: .firstTextBaseline, spacing: 2) {
                 Text(value)
                     .font(.title3.bold())
-                    .foregroundColor(.white)
+                    .foregroundColor(.awInk)
 
                 if !unit.isEmpty {
                     Text(unit)
                         .font(.caption)
-                        .foregroundColor(.white.opacity(0.8))
+                        .foregroundColor(.awInkMuted)
                 }
             }
 
             Text(label)
                 .font(.caption2)
-                .foregroundColor(.white.opacity(0.9))
+                .foregroundColor(.awInkSoft)
         }
         .frame(maxWidth: .infinity)
     }
@@ -916,12 +891,16 @@ struct ForecastTabButton: View {
         Button(action: action) {
             Text(title)
                 .font(.subheadline.bold())
-                .foregroundColor(isSelected ? .black : .white.opacity(0.7))
+                .foregroundColor(isSelected ? .awPrimary : .awInkSoft)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 12)
                 .background(
                     RoundedRectangle(cornerRadius: 15)
-                        .fill(isSelected ? .white : .white.opacity(0.1))
+                        .fill(isSelected ? Color.awInk : Color.awSurface)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 15)
+                                .stroke(isSelected ? Color.clear : Color.awBorder, lineWidth: 1)
+                        )
                 )
         }
     }
@@ -936,25 +915,25 @@ struct HourlyForecastItem: View {
         VStack(spacing: 8) {
             Text(hour)
                 .font(.caption)
-                .foregroundColor(.white.opacity(0.9))
+                .foregroundColor(.awInkSoft)
 
             Image(systemName: icon)
                 .font(.title2)
-                .foregroundColor(.white)
+                .foregroundColor(.awInk)
                 .symbolRenderingMode(.multicolor)
 
             Text("\(temp)°")
                 .font(.title3.bold())
-                .foregroundColor(.white)
+                .foregroundColor(.awInk)
         }
         .frame(width: 60)
         .padding(.vertical, 12)
         .background(
             RoundedRectangle(cornerRadius: 15)
-                .fill(.ultraThinMaterial.opacity(0.3))
+                .fill(Color.awSurface)
                 .overlay(
                     RoundedRectangle(cornerRadius: 15)
-                        .stroke(.white.opacity(0.2), lineWidth: 1)
+                        .stroke(Color.awBorder, lineWidth: 1)
                 )
         )
     }

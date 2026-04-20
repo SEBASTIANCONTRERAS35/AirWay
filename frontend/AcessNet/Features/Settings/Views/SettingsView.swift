@@ -229,6 +229,62 @@ struct SettingsView: View {
                                 }
                             }
                         }
+
+                        // AirWay brand theme — paleta sincronizada con la página web
+                        Button {
+                            withAnimation(.easeInOut(duration: 0.5)) {
+                                appSettings.isAirWayTheme = true
+                            }
+                        } label: {
+                            HStack(spacing: 12) {
+                                ZStack {
+                                    RoundedRectangle(cornerRadius: 10)
+                                        .fill(
+                                            LinearGradient(
+                                                colors: [Color(hex: "#060A18"), Color(hex: "#0D1427"), Color(hex: "#0A1D4D")],
+                                                startPoint: .top, endPoint: .bottom
+                                            )
+                                        )
+                                        .frame(width: 44, height: 44)
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 10)
+                                                .stroke(Color(hex: "#0099FF").opacity(0.5), lineWidth: 1)
+                                        )
+
+                                    Image(systemName: "sparkles")
+                                        .font(.system(size: 18, weight: .semibold))
+                                        .foregroundColor(Color(hex: "#0099FF"))
+                                }
+
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("AirWay")
+                                        .font(.subheadline.bold())
+                                        .foregroundColor(.white)
+
+                                    Text("Brand palette · same as the website")
+                                        .font(.caption2)
+                                        .foregroundColor(.white.opacity(0.55))
+                                }
+
+                                Spacer()
+
+                                if appSettings.isAirWayTheme {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .foregroundColor(Color(hex: "#0099FF"))
+                                }
+                            }
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 10)
+                            .background(
+                                RoundedRectangle(cornerRadius: 14)
+                                    .fill(appSettings.isAirWayTheme ? Color(hex: "#0099FF").opacity(0.12) : .white.opacity(0.05))
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 14)
+                                            .stroke(appSettings.isAirWayTheme ? Color(hex: "#0099FF").opacity(0.5) : .white.opacity(0.08), lineWidth: 1)
+                                    )
+                            )
+                        }
+                        .buttonStyle(.plain)
                     }
                     .padding(.horizontal)
 

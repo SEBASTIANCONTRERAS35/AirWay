@@ -121,8 +121,8 @@ struct AQIHomeView: View {
     var body: some View {
         NavigationView {
             ZStack {
-                // Background — dynamic weather
-                WeatherBackground(condition: activeWeather)
+                // Background — dynamic weather (or AirWay brand palette)
+                WeatherBackground(condition: activeWeather, isAirWay: appSettings.isAirWayTheme)
                     .ignoresSafeArea()
 
                 ScrollView(showsIndicators: false) {
@@ -1555,11 +1555,13 @@ struct AQIHomeView: View {
     // MARK: - Glass Card Background
 
     private var activeWeather: WeatherCondition {
-        appSettings.weatherOverride ?? airQualityData.weatherCondition
+        // Si el tema AirWay está activo, usamos una condición neutra para animaciones/particles; el fondo se renderiza con isAirWay.
+        if appSettings.isAirWayTheme { return .overcast }
+        return appSettings.weatherOverride ?? airQualityData.weatherCondition
     }
 
     private var theme: WeatherTheme {
-        WeatherTheme(condition: activeWeather)
+        WeatherTheme(condition: activeWeather, isAirWay: appSettings.isAirWayTheme)
     }
 
     private var glassCard: some View {
@@ -2059,82 +2061,135 @@ struct ForecastSparklineCard: View {
     let colorForAQI: (Int) -> Color
 
     @State private var animate: Bool = false
+    @State private var holdDotPulse: Bool = false
 
+    private var currentAQI: Int { points.first?.aqi ?? 0 }
+    private var projectedAQI: Int { points.last?.aqi ?? currentAQI }
+    private var delta: Int { projectedAQI - currentAQI }
     private var peak: Point? { points.dropFirst().max(by: { $0.aqi < $1.aqi }) }
     private var minY: Int { max(0, (points.map(\.aqi).min() ?? 0) - 8) }
     private var maxY: Int { max((points.map(\.aqi).max() ?? 80) + 8, minY + 20) }
+    private var currentColor: Color { colorForAQI(currentAQI) }
+    private var projectedColor: Color { colorForAQI(projectedAQI) }
+
+    private var trendMeta: (label: String, color: Color, icon: String)? {
+        switch trend {
+        case "subiendo": return ("Up", .orange, "arrow.up.right")
+        case "bajando":  return ("Down", .green, "arrow.down.right")
+        case "estable":  return ("Flat", .gray, "arrow.right")
+        default:         return nil
+        }
+    }
 
     var body: some View {
-        VStack(spacing: 0) {
-            // Header
-            HStack(spacing: 4) {
-                Image(systemName: "waveform.path.ecg")
-                    .font(.system(size: 9, weight: .bold))
-                    .foregroundColor(.white.opacity(0.55))
-                Text("Forecast")
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundColor(.white.opacity(0.55))
+        VStack(alignment: .leading, spacing: 0) {
+            // Header eyebrow + trend chip
+            HStack(alignment: .center, spacing: 6) {
+                Text("FORECAST")
+                    .font(.system(size: 9, weight: .heavy, design: .monospaced))
+                    .tracking(1.4)
+                    .foregroundColor(.white.opacity(0.45))
+                Text("· 6h")
+                    .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                    .foregroundColor(.white.opacity(0.3))
                 Spacer()
-                if let trend = trend { trendChip(trend) }
-            }
-            .padding(.horizontal, 12)
-            .padding(.top, 10)
-
-            // Peak hint
-            if let pk = peak {
-                HStack(spacing: 3) {
-                    Image(systemName: "bolt.fill")
-                        .font(.system(size: 7, weight: .bold))
-                        .foregroundColor(colorForAQI(pk.aqi))
-                    Text("Peak \(pk.aqi) · \(pk.label)")
-                        .font(.system(size: 9, weight: .semibold))
-                        .foregroundColor(.white.opacity(0.6))
-                    Spacer()
+                if let t = trendMeta {
+                    trendChip(label: t.label, color: t.color, icon: t.icon)
                 }
-                .padding(.horizontal, 12)
-                .padding(.top, 4)
             }
+            .padding(.horizontal, 14)
+            .padding(.top, 12)
 
-            // Chart
-            GeometryReader { geo in
-                let w = geo.size.width
-                let h = geo.size.height
-                let n = max(points.count - 1, 1)
-                let range = CGFloat(maxY - minY)
-                let positions: [CGPoint] = points.enumerated().map { i, p in
-                    let x = w * CGFloat(i) / CGFloat(n)
-                    let ny = range > 0 ? 1 - CGFloat(p.aqi - minY) / range : 0.5
-                    return CGPoint(x: x, y: 14 + ny * (h - 26))
-                }
-                let firstColor = colorForAQI(points.first?.aqi ?? 50)
-                let lastColor = colorForAQI(points.last?.aqi ?? 50)
+            // Hero: now → projected + delta pill
+            HStack(alignment: .lastTextBaseline, spacing: 5) {
+                Text("\(currentAQI)")
+                    .font(.system(size: 34, weight: .heavy, design: .rounded))
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [currentColor, currentColor.opacity(0.72)],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+                    .shadow(color: currentColor.opacity(0.4), radius: 8, y: 2)
+                Image(systemName: "arrow.right")
+                    .font(.system(size: 9, weight: .heavy))
+                    .foregroundColor(.white.opacity(0.3))
+                    .padding(.bottom, 4)
+                Text("\(projectedAQI)")
+                    .font(.system(size: 18, weight: .bold, design: .rounded))
+                    .foregroundColor(projectedColor.opacity(0.9))
+                    .padding(.bottom, 1)
+                Spacer()
+                deltaPill
+            }
+            .padding(.horizontal, 14)
+            .padding(.top, 4)
 
-                ZStack {
-                    // Area fill
-                    Path { p in
-                        guard let first = positions.first, let last = positions.last else { return }
-                        p.move(to: CGPoint(x: first.x, y: h))
-                        p.addLine(to: first)
-                        for pt in positions.dropFirst() { p.addLine(to: pt) }
-                        p.addLine(to: CGPoint(x: last.x, y: h))
-                        p.closeSubpath()
+            // Sparkline
+            chart
+                .frame(maxHeight: .infinity)
+                .padding(.horizontal, 10)
+                .padding(.top, 2)
+
+            // Footer: hold hint + peak
+            HStack(spacing: 5) {
+                holdDot
+                Text("Hold for detail")
+                    .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                    .foregroundColor(.white.opacity(0.45))
+                Spacer()
+                if let pk = peak, pk.id != points.first?.id {
+                    HStack(spacing: 2) {
+                        Image(systemName: "bolt.fill")
+                            .font(.system(size: 6, weight: .bold))
+                            .foregroundColor(colorForAQI(pk.aqi))
+                        Text("Peak \(pk.aqi) · \(pk.label)")
+                            .font(.system(size: 9, weight: .medium, design: .monospaced))
+                            .foregroundColor(.white.opacity(0.45))
                     }
+                }
+            }
+            .padding(.horizontal, 14)
+            .padding(.bottom, 12)
+        }
+        .onAppear {
+            animate = true
+            holdDotPulse = true
+        }
+    }
+
+    // MARK: – Chart
+
+    private var chart: some View {
+        GeometryReader { geo in
+            let w = geo.size.width
+            let h = geo.size.height
+            let n = max(points.count - 1, 1)
+            let range = CGFloat(maxY - minY)
+            let positions: [CGPoint] = points.enumerated().map { i, p in
+                let x = w * CGFloat(i) / CGFloat(n)
+                let ny = range > 0 ? 1 - CGFloat(p.aqi - minY) / range : 0.5
+                return CGPoint(x: x, y: 10 + ny * (h - 20))
+            }
+            let firstColor = colorForAQI(points.first?.aqi ?? 50)
+            let lastColor = colorForAQI(points.last?.aqi ?? 50)
+
+            ZStack {
+                // Smooth area fill
+                smoothPath(points: positions, closeBottom: h)
                     .fill(
                         LinearGradient(
-                            colors: [lastColor.opacity(0.45), firstColor.opacity(0.05)],
+                            colors: [lastColor.opacity(0.5), firstColor.opacity(0.03)],
                             startPoint: .top,
                             endPoint: .bottom
                         )
                     )
                     .opacity(animate ? 1 : 0)
-                    .animation(.easeOut(duration: 0.9).delay(0.3), value: animate)
+                    .animation(.easeOut(duration: 0.9).delay(0.25), value: animate)
 
-                    // Line
-                    Path { p in
-                        guard let first = positions.first else { return }
-                        p.move(to: first)
-                        for pt in positions.dropFirst() { p.addLine(to: pt) }
-                    }
+                // Smooth line
+                smoothPath(points: positions, closeBottom: nil)
                     .trim(from: 0, to: animate ? 1 : 0)
                     .stroke(
                         LinearGradient(
@@ -2142,95 +2197,125 @@ struct ForecastSparklineCard: View {
                             startPoint: .leading,
                             endPoint: .trailing
                         ),
-                        style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round)
+                        style: StrokeStyle(lineWidth: 2.4, lineCap: .round, lineJoin: .round)
                     )
+                    .shadow(color: lastColor.opacity(0.35), radius: 4, y: 1)
                     .animation(.easeOut(duration: 1.1).delay(0.1), value: animate)
 
-                    // Markers + value labels
-                    ForEach(Array(points.enumerated()), id: \.element.id) { i, p in
-                        let pos = positions[i]
-                        let color = colorForAQI(p.aqi)
-                        let isCurrent = i == 0
-                        let isPeak = p.id == peak?.id
+                // Dots: big for Now+End, small for middle
+                ForEach(Array(points.enumerated()), id: \.element.id) { i, p in
+                    let pos = positions[i]
+                    let color = colorForAQI(p.aqi)
+                    let isCurrent = i == 0
+                    let isEnd = i == points.count - 1
+                    let dotSize: CGFloat = isCurrent ? 9 : (isEnd ? 7 : 4)
 
-                        ZStack {
-                            if isCurrent {
-                                Circle()
-                                    .stroke(color.opacity(0.35), lineWidth: 6)
-                                    .frame(width: 16, height: 16)
-                                    .scaleEffect(animate ? 1.1 : 0.8)
-                                    .opacity(animate ? 0.0 : 0.8)
-                                    .animation(.easeOut(duration: 1.6).repeatForever(autoreverses: false), value: animate)
-                            }
+                    ZStack {
+                        if isCurrent {
                             Circle()
-                                .fill(color)
-                                .frame(width: isCurrent ? 9 : 7, height: isCurrent ? 9 : 7)
-                                .shadow(color: color.opacity(0.7), radius: 4)
-                            Circle()
-                                .stroke(.white.opacity(isCurrent ? 0.9 : 0.25), lineWidth: 1)
-                                .frame(width: isCurrent ? 9 : 7, height: isCurrent ? 9 : 7)
+                                .stroke(color.opacity(0.45), lineWidth: 5)
+                                .frame(width: 16, height: 16)
+                                .scaleEffect(animate ? 1.2 : 0.7)
+                                .opacity(animate ? 0.0 : 0.9)
+                                .animation(
+                                    .easeOut(duration: 1.8).repeatForever(autoreverses: false),
+                                    value: animate
+                                )
                         }
-                        .position(pos)
-                        .scaleEffect(animate ? 1 : 0)
-                        .animation(.spring(response: 0.5, dampingFraction: 0.7).delay(0.15 + Double(i) * 0.1), value: animate)
-
-                        // AQI number
-                        Text("\(p.aqi)")
-                            .font(.system(size: 10, weight: .bold, design: .rounded))
-                            .foregroundColor(color)
-                            .padding(.horizontal, 3)
-                            .padding(.vertical, 1)
-                            .background(
-                                Capsule()
-                                    .fill(Color.black.opacity(isPeak ? 0.4 : 0))
-                            )
-                            .position(x: pos.x, y: max(10, pos.y - 12))
-                            .opacity(animate ? 1 : 0)
-                            .animation(.easeOut(duration: 0.3).delay(0.3 + Double(i) * 0.1), value: animate)
+                        Circle()
+                            .fill(color)
+                            .frame(width: dotSize, height: dotSize)
+                            .shadow(color: color.opacity(0.8), radius: isCurrent ? 5 : 3)
+                        Circle()
+                            .stroke(.white.opacity(isCurrent ? 0.95 : (isEnd ? 0.55 : 0)), lineWidth: 1)
+                            .frame(width: dotSize, height: dotSize)
                     }
+                    .position(pos)
+                    .scaleEffect(animate ? 1 : 0)
+                    .animation(
+                        .spring(response: 0.45, dampingFraction: 0.7)
+                            .delay(0.2 + Double(i) * 0.08),
+                        value: animate
+                    )
                 }
             }
-            .frame(maxHeight: .infinity)
-            .padding(.horizontal, 14)
-            .padding(.top, 6)
-
-            // Hour labels
-            HStack(spacing: 0) {
-                ForEach(points) { p in
-                    Text(p.label)
-                        .font(.system(size: 9, weight: .medium, design: .monospaced))
-                        .foregroundColor(p.label == "Now" ? .white.opacity(0.8) : .white.opacity(0.35))
-                        .frame(maxWidth: .infinity)
-                }
-            }
-            .padding(.horizontal, 8)
-            .padding(.bottom, 10)
         }
-        .onAppear { animate = true }
     }
 
-    private func trendChip(_ trend: String) -> some View {
-        let label: String
-        let color: Color
-        let icon: String
-        switch trend {
-        case "subiendo": label = "Worse";  color = .orange; icon = "arrow.up.right"
-        case "bajando":  label = "Better"; color = .green;  icon = "arrow.down.right"
-        default:         label = "Stable"; color = .gray;   icon = "arrow.right"
-        }
+    // MARK: – Helpers
 
-        return HStack(spacing: 3) {
+    private func smoothPath(points pts: [CGPoint], closeBottom yBottom: CGFloat?) -> Path {
+        var path = Path()
+        guard let first = pts.first else { return path }
+        if let bottom = yBottom {
+            path.move(to: CGPoint(x: first.x, y: bottom))
+            path.addLine(to: first)
+        } else {
+            path.move(to: first)
+        }
+        for i in 1..<pts.count {
+            let prev = pts[i - 1]
+            let cur = pts[i]
+            let midX = (prev.x + cur.x) / 2
+            path.addCurve(
+                to: cur,
+                control1: CGPoint(x: midX, y: prev.y),
+                control2: CGPoint(x: midX, y: cur.y)
+            )
+        }
+        if let bottom = yBottom, let last = pts.last {
+            path.addLine(to: CGPoint(x: last.x, y: bottom))
+            path.closeSubpath()
+        }
+        return path
+    }
+
+    private var deltaPill: some View {
+        let color: Color = delta > 2 ? .orange : (delta < -2 ? .green : Color.white.opacity(0.45))
+        let icon: String = delta > 2 ? "arrow.up.right" : (delta < -2 ? "arrow.down.right" : "minus")
+        let text: String = (delta > 0 ? "+" : "") + "\(delta)"
+        return HStack(spacing: 2) {
             Image(systemName: icon)
-                .font(.system(size: 7, weight: .heavy))
-            Text(label)
-                .font(.system(size: 9, weight: .heavy))
+                .font(.system(size: 8, weight: .heavy))
+            Text(text)
+                .font(.system(size: 11, weight: .heavy, design: .rounded))
         }
         .foregroundColor(color)
         .padding(.horizontal, 7)
         .padding(.vertical, 3)
         .background(
             Capsule()
-                .fill(color.opacity(0.18))
+                .fill(color.opacity(0.16))
+                .overlay(Capsule().stroke(color.opacity(0.35), lineWidth: 0.6))
+        )
+    }
+
+    private var holdDot: some View {
+        Circle()
+            .fill(Color.cyan.opacity(0.85))
+            .frame(width: 5, height: 5)
+            .shadow(color: Color.cyan.opacity(0.6), radius: 4)
+            .scaleEffect(holdDotPulse ? 1 : 0.65)
+            .opacity(holdDotPulse ? 1 : 0.5)
+            .animation(
+                .easeInOut(duration: 1.1).repeatForever(autoreverses: true),
+                value: holdDotPulse
+            )
+    }
+
+    private func trendChip(label: String, color: Color, icon: String) -> some View {
+        HStack(spacing: 2.5) {
+            Image(systemName: icon)
+                .font(.system(size: 7, weight: .heavy))
+            Text(label)
+                .font(.system(size: 8, weight: .heavy))
+        }
+        .foregroundColor(color)
+        .padding(.horizontal, 6)
+        .padding(.vertical, 2.5)
+        .background(
+            Capsule()
+                .fill(color.opacity(0.16))
                 .overlay(Capsule().stroke(color.opacity(0.4), lineWidth: 0.5))
         )
     }
@@ -2256,12 +2341,24 @@ struct ForecastDetailOverlay: View {
     @State private var animate: Bool = false
 
     private var currentAQI: Int { info.points.first?.aqi ?? 0 }
-    private var peak: ForecastSparklineCard.Point? { info.points.dropFirst().max(by: { $0.aqi < $1.aqi }) }
-    private var minValue: Int { max(0, (hourlyPoints.map(\.aqi).min() ?? 0) - 15) }
-    private var maxValue: Int { max((hourlyPoints.map(\.aqi).max() ?? 80) + 15, minValue + 25) }
-    private var delta: Int { (info.points.last?.aqi ?? 0) - currentAQI }
+    private var projectedAQI: Int { info.points.last?.aqi ?? currentAQI }
+    private var peak: ForecastSparklineCard.Point? {
+        info.points.dropFirst().max(by: { $0.aqi < $1.aqi })
+    }
+    private var delta: Int { projectedAQI - currentAQI }
+    private var currentColor: Color { info.colorForAQI(currentAQI) }
+    private var projectedColor: Color { info.colorForAQI(projectedAQI) }
+    private var peakColor: Color {
+        peak.map { info.colorForAQI($0.aqi) } ?? projectedColor
+    }
 
-    // Parsed anchor hours from labels ("Now", "+1h", "+3h", "+6h")
+    private var minValue: Int {
+        max(0, (hourlyPoints.map(\.aqi).min() ?? 0) - 15)
+    }
+    private var maxValue: Int {
+        max((hourlyPoints.map(\.aqi).max() ?? 80) + 15, minValue + 25)
+    }
+
     private var anchorHours: [(hour: Int, aqi: Int)] {
         info.points.compactMap { p in
             if p.label == "Now" { return (0, p.aqi) }
@@ -2272,7 +2369,6 @@ struct ForecastDetailOverlay: View {
         }.sorted { $0.hour < $1.hour }
     }
 
-    // Dense hourly series (0...maxHour) with linear interpolation
     private var hourlyPoints: [ForecastSparklineCard.Point] {
         let anchors = anchorHours
         guard let maxH = anchors.last?.hour, maxH > 0 else { return info.points }
@@ -2294,7 +2390,7 @@ struct ForecastDetailOverlay: View {
         info.points.contains(where: { $0.label == p.label })
     }
 
-    private var trendLabel: (String, Color, String) {
+    private var trendLabel: (label: String, color: Color, icon: String) {
         switch info.trend {
         case "subiendo": return ("Worsening", .orange, "arrow.up.right")
         case "bajando":  return ("Improving", .green, "arrow.down.right")
@@ -2303,7 +2399,9 @@ struct ForecastDetailOverlay: View {
     }
 
     private var recommendation: String {
-        guard let pk = peak else { return "Conditions holding steady. Normal activity is fine." }
+        guard let pk = peak else {
+            return "Conditions holding steady. Normal activity is fine."
+        }
         if pk.aqi >= 151 {
             return "Limit outdoor activity around \(pk.label). Sensitive groups should stay indoors."
         } else if pk.aqi >= 101 {
@@ -2315,130 +2413,187 @@ struct ForecastDetailOverlay: View {
         }
     }
 
+    private func levelName(_ aqi: Int) -> String {
+        switch aqi {
+        case 0..<51:    return "Good"
+        case 51..<101:  return "Moderate"
+        case 101..<151: return "USG"
+        case 151..<201: return "Unhealthy"
+        case 201..<301: return "V.Unhealthy"
+        default:        return "Hazardous"
+        }
+    }
+
     var body: some View {
         ZStack {
+            // Backdrop (same as Exposure overlay)
             Rectangle()
-                .fill(.black.opacity(0.6))
+                .fill(.black.opacity(0.7))
                 .ignoresSafeArea()
-                .background(.ultraThinMaterial.opacity(0.4))
+                .background(.ultraThinMaterial.opacity(0.5))
 
-            VStack(spacing: 16) {
-                // Header
-                HStack(alignment: .center) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Forecast")
-                            .font(.system(size: 11, weight: .bold))
-                            .foregroundColor(.white.opacity(0.5))
-                            .textCase(.uppercase)
-                            .tracking(1.3)
-                        Text("Next 6 Hours")
-                            .font(.system(size: 22, weight: .heavy, design: .rounded))
-                            .foregroundStyle(
-                                LinearGradient(
-                                    colors: [.white, .white.opacity(0.75)],
-                                    startPoint: .top,
-                                    endPoint: .bottom
-                                )
-                            )
-                    }
-                    Spacer()
-                    HStack(spacing: 4) {
-                        Image(systemName: trendLabel.2)
-                            .font(.system(size: 9, weight: .heavy))
-                        Text(trendLabel.0)
-                            .font(.system(size: 10, weight: .heavy))
-                    }
-                    .foregroundColor(trendLabel.1)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 5)
-                    .background(
-                        Capsule()
-                            .fill(trendLabel.1.opacity(0.2))
-                            .overlay(Capsule().stroke(trendLabel.1.opacity(0.4), lineWidth: 0.8))
-                    )
-                }
-
-                // Big chart
+            // Card
+            VStack(alignment: .leading, spacing: 14) {
+                headerBlock
+                heroBlock
                 chartView
                     .frame(height: 150)
-
-                // Stats grid
-                HStack(spacing: 8) {
-                    statBox(
-                        label: "Now",
-                        value: "\(currentAQI)",
-                        sub: levelName(currentAQI),
-                        color: info.colorForAQI(currentAQI)
-                    )
-                    if let pk = peak {
-                        statBox(
-                            label: "Peak",
-                            value: "\(pk.aqi)",
-                            sub: pk.label,
-                            color: info.colorForAQI(pk.aqi)
-                        )
-                    }
-                    statBox(
-                        label: "Δ 6h",
-                        value: (delta >= 0 ? "+" : "") + "\(delta)",
-                        sub: delta > 0 ? "Rising" : delta < 0 ? "Falling" : "Flat",
-                        color: delta > 0 ? .orange : delta < 0 ? .green : .gray
-                    )
-                }
-
-                // Recommendation
-                HStack(alignment: .top, spacing: 10) {
-                    Image(systemName: "sparkles")
-                        .font(.system(size: 14))
-                        .foregroundColor(.purple)
-                        .frame(width: 28, height: 28)
-                        .background(Circle().fill(.purple.opacity(0.18)))
-                    Text(recommendation)
-                        .font(.system(size: 11))
-                        .foregroundColor(.white.opacity(0.75))
-                        .fixedSize(horizontal: false, vertical: true)
-                    Spacer(minLength: 0)
-                }
-                .padding(10)
-                .background(
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(.white.opacity(0.05))
-                )
-
-                Text("Release to close")
-                    .font(.system(size: 10, weight: .medium))
-                    .foregroundColor(.white.opacity(0.3))
+                statsRow
+                insightBlock
+                footerHint
             }
-            .padding(22)
-            .frame(maxWidth: 360)
-            .background(
-                RoundedRectangle(cornerRadius: 28, style: .continuous)
-                    .fill(Color.black.opacity(0.78))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 28, style: .continuous)
-                            .stroke(
-                                LinearGradient(
-                                    colors: [trendLabel.1.opacity(0.6), trendLabel.1.opacity(0.1)],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                ),
-                                lineWidth: 1
-                            )
-                    )
-                    .shadow(color: trendLabel.1.opacity(0.3), radius: 32, y: 8)
-            )
-            .padding(.horizontal, 24)
+            .padding(20)
+            .frame(maxWidth: 360, alignment: .leading)
+            .background(cardBackground)
+            .padding(.horizontal, 16)
         }
         .onAppear { animate = true }
     }
 
-    private func statBox(label: String, value: String, sub: String, color: Color) -> some View {
-        VStack(spacing: 2) {
-            Text(label)
-                .font(.system(size: 9, weight: .bold))
-                .foregroundColor(.white.opacity(0.45))
-                .textCase(.uppercase)
-                .tracking(0.8)
+    // MARK: – Card background
+
+    private var cardBackground: some View {
+        RoundedRectangle(cornerRadius: 30, style: .continuous)
+            .fill(Color.black.opacity(0.85))
+            .overlay(
+                RoundedRectangle(cornerRadius: 30, style: .continuous)
+                    .stroke(
+                        LinearGradient(
+                            colors: [
+                                peakColor.opacity(0.5),
+                                trendLabel.color.opacity(0.2)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: 1
+                    )
+            )
+            .shadow(color: peakColor.opacity(0.25), radius: 40, y: 10)
+    }
+
+    // MARK: – Sections
+
+    private var headerBlock: some View {
+        HStack(alignment: .top) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text("ATMOSPHERIC FORECAST")
+                    .font(.system(size: 9, weight: .heavy, design: .monospaced))
+                    .tracking(1.8)
+                    .foregroundColor(.white.opacity(0.45))
+                Text("Next 6 Hours")
+                    .font(.system(size: 26, weight: .heavy, design: .rounded))
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [.white, .white.opacity(0.72)],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+            }
+            Spacer()
+            trendChip
+        }
+    }
+
+    private var trendChip: some View {
+        HStack(spacing: 4) {
+            Image(systemName: trendLabel.icon)
+                .font(.system(size: 10, weight: .heavy))
+            Text(trendLabel.label)
+                .font(.system(size: 10, weight: .heavy))
+        }
+        .foregroundColor(trendLabel.color)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 5)
+        .background(
+            Capsule()
+                .fill(trendLabel.color.opacity(0.18))
+                .overlay(Capsule().stroke(trendLabel.color.opacity(0.4), lineWidth: 0.8))
+        )
+    }
+
+    private var heroBlock: some View {
+        HStack(alignment: .lastTextBaseline, spacing: 12) {
+            Text("\(projectedAQI)")
+                .font(.system(size: 64, weight: .heavy, design: .rounded))
+                .foregroundStyle(
+                    LinearGradient(
+                        colors: [peakColor, peakColor.opacity(0.7)],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+                .shadow(color: peakColor.opacity(0.45), radius: 12, y: 4)
+                .fixedSize()
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text(levelName(projectedAQI).uppercased())
+                    .font(.system(size: 10, weight: .heavy, design: .monospaced))
+                    .tracking(1.4)
+                    .foregroundColor(peakColor)
+                HStack(spacing: 4) {
+                    Image(systemName: delta >= 0 ? "arrow.up.right" : "arrow.down.right")
+                        .font(.system(size: 9, weight: .heavy))
+                    Text((delta >= 0 ? "+" : "") + "\(delta) vs now")
+                        .font(.system(size: 11, weight: .semibold, design: .rounded))
+                }
+                .foregroundColor(.white.opacity(0.72))
+            }
+            .padding(.bottom, 6)
+            Spacer(minLength: 0)
+        }
+    }
+
+    private var statsRow: some View {
+        HStack(spacing: 0) {
+            statCell(
+                label: "Now",
+                value: "\(currentAQI)",
+                sub: levelName(currentAQI),
+                color: currentColor
+            )
+            statDivider
+            if let pk = peak {
+                statCell(
+                    label: "Peak",
+                    value: "\(pk.aqi)",
+                    sub: pk.label,
+                    color: info.colorForAQI(pk.aqi)
+                )
+                statDivider
+            }
+            statCell(
+                label: "Δ 6h",
+                value: (delta >= 0 ? "+" : "") + "\(delta)",
+                sub: delta > 0 ? "Rising" : (delta < 0 ? "Falling" : "Flat"),
+                color: delta > 2 ? .orange : (delta < -2 ? .green : .gray)
+            )
+        }
+        .padding(.vertical, 14)
+        .padding(.horizontal, 16)
+        .background(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(Color.white.opacity(0.04))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .stroke(Color.white.opacity(0.06), lineWidth: 0.8)
+                )
+        )
+    }
+
+    private var statDivider: some View {
+        Rectangle()
+            .fill(Color.white.opacity(0.06))
+            .frame(width: 1, height: 38)
+    }
+
+    private func statCell(label: String, value: String, sub: String, color: Color) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(label.uppercased())
+                .font(.system(size: 9, weight: .heavy, design: .monospaced))
+                .tracking(1.2)
+                .foregroundColor(.white.opacity(0.42))
             Text(value)
                 .font(.system(size: 22, weight: .heavy, design: .rounded))
                 .foregroundColor(color)
@@ -2447,21 +2602,73 @@ struct ForecastDetailOverlay: View {
                 .foregroundColor(.white.opacity(0.5))
                 .lineLimit(1)
         }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var insightBlock: some View {
+        HStack(alignment: .top, spacing: 10) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 9, style: .continuous)
+                    .fill(
+                        LinearGradient(
+                            colors: [.purple.opacity(0.38), .indigo.opacity(0.28)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                Image(systemName: "sparkles")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(.white)
+            }
+            .frame(width: 30, height: 30)
+            .shadow(color: .purple.opacity(0.4), radius: 6)
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text("AI INSIGHT")
+                    .font(.system(size: 8, weight: .heavy, design: .monospaced))
+                    .tracking(1.4)
+                    .foregroundColor(.purple.opacity(0.9))
+                Text(recommendation)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(.white.opacity(0.82))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(12)
         .background(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(color.opacity(0.08))
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(
+                    LinearGradient(
+                        colors: [.white.opacity(0.06), .white.opacity(0.02)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
                 .overlay(
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .stroke(color.opacity(0.25), lineWidth: 0.8)
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .stroke(.white.opacity(0.08), lineWidth: 0.8)
                 )
         )
     }
 
+    private var footerHint: some View {
+        HStack(spacing: 5) {
+            Circle()
+                .fill(Color.white.opacity(0.45))
+                .frame(width: 4, height: 4)
+            Text("Release to close")
+                .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                .tracking(0.6)
+                .foregroundColor(.white.opacity(0.35))
+        }
+        .frame(maxWidth: .infinity, alignment: .center)
+    }
+
+    // MARK: – Chart
+
     private var chartView: some View {
         let series = hourlyPoints
-
         return GeometryReader { geo in
             let w = geo.size.width
             let h = geo.size.height
@@ -2476,7 +2683,7 @@ struct ForecastDetailOverlay: View {
             let lastColor = info.colorForAQI(series.last?.aqi ?? 50)
 
             ZStack {
-                // Horizontal grid lines
+                // Grid
                 ForEach(0..<4) { i in
                     let y = 22 + CGFloat(i) * (h - 56) / 3
                     Path { p in
@@ -2486,129 +2693,155 @@ struct ForecastDetailOverlay: View {
                     .stroke(.white.opacity(0.05), style: StrokeStyle(lineWidth: 0.5, dash: [3, 3]))
                 }
 
-                // Area fill
-                Path { p in
-                    guard let first = positions.first, let last = positions.last else { return }
-                    p.move(to: CGPoint(x: first.x, y: h - 22))
-                    p.addLine(to: first)
-                    for pt in positions.dropFirst() { p.addLine(to: pt) }
-                    p.addLine(to: CGPoint(x: last.x, y: h - 22))
-                    p.closeSubpath()
-                }
-                .fill(
-                    LinearGradient(
-                        colors: [lastColor.opacity(0.55), firstColor.opacity(0.05)],
-                        startPoint: .top,
-                        endPoint: .bottom
+                // Smooth area
+                smoothPath(points: positions, closeBottom: h - 22)
+                    .fill(
+                        LinearGradient(
+                            colors: [lastColor.opacity(0.55), firstColor.opacity(0.02)],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
                     )
-                )
-                .opacity(animate ? 1 : 0)
-                .animation(.easeOut(duration: 0.9).delay(0.2), value: animate)
+                    .opacity(animate ? 1 : 0)
+                    .animation(.easeOut(duration: 0.9).delay(0.2), value: animate)
 
-                // Line
-                Path { p in
-                    guard let first = positions.first else { return }
-                    p.move(to: first)
-                    for pt in positions.dropFirst() { p.addLine(to: pt) }
-                }
-                .trim(from: 0, to: animate ? 1 : 0)
-                .stroke(
-                    LinearGradient(
-                        colors: [firstColor, lastColor],
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    ),
-                    style: StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round)
-                )
-                .animation(.easeOut(duration: 1.1), value: animate)
+                // Smooth line
+                smoothPath(points: positions, closeBottom: nil)
+                    .trim(from: 0, to: animate ? 1 : 0)
+                    .stroke(
+                        LinearGradient(
+                            colors: [firstColor, lastColor],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        ),
+                        style: StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round)
+                    )
+                    .shadow(color: lastColor.opacity(0.45), radius: 6, y: 2)
+                    .animation(.easeOut(duration: 1.1), value: animate)
 
-                // Points
+                // Markers
                 ForEach(Array(series.enumerated()), id: \.element.id) { i, p in
-                    let pos = positions[i]
-                    let color = info.colorForAQI(p.aqi)
-                    let isCurrent = i == 0
-                    let isAnchorPt = isAnchor(p)
-                    let isPeak = isAnchorPt && p.aqi == peak?.aqi && p.label == peak?.label
-
-                    ZStack {
-                        if isCurrent {
-                            Circle()
-                                .stroke(color.opacity(0.35), lineWidth: 8)
-                                .frame(width: 24, height: 24)
-                                .scaleEffect(animate ? 1.2 : 0.8)
-                                .opacity(animate ? 0.0 : 0.8)
-                                .animation(.easeOut(duration: 1.8).repeatForever(autoreverses: false), value: animate)
-                        }
-                        Circle()
-                            .fill(color)
-                            .frame(
-                                width: isCurrent ? 14 : (isAnchorPt ? 11 : 5),
-                                height: isCurrent ? 14 : (isAnchorPt ? 11 : 5)
-                            )
-                            .shadow(color: color.opacity(isAnchorPt ? 0.8 : 0.4), radius: isAnchorPt ? 6 : 2)
-                        if isAnchorPt {
-                            Circle()
-                                .stroke(.white.opacity(isCurrent ? 0.95 : 0.3), lineWidth: 1.5)
-                                .frame(width: isCurrent ? 14 : 11, height: isCurrent ? 14 : 11)
-                        }
-                    }
-                    .position(pos)
-                    .scaleEffect(animate ? 1 : 0)
-                    .animation(.spring(response: 0.5, dampingFraction: 0.7).delay(0.2 + Double(i) * 0.05), value: animate)
-
-                    // Value bubble — only for anchors
-                    if isAnchorPt {
-                        Text("\(p.aqi)")
-                            .font(.system(size: 11, weight: .heavy, design: .rounded))
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 5)
-                            .padding(.vertical, 2)
-                            .background(
-                                Capsule()
-                                    .fill(color.opacity(0.95))
-                                    .shadow(color: color.opacity(0.5), radius: 4)
-                            )
-                            .position(x: pos.x, y: max(14, pos.y - 16))
-                            .opacity(animate ? 1 : 0)
-                            .scaleEffect(animate ? 1 : 0.6)
-                            .animation(.spring(response: 0.4, dampingFraction: 0.7).delay(0.35 + Double(i) * 0.05), value: animate)
-                    }
-
-                    if isPeak {
-                        Text("PEAK")
-                            .font(.system(size: 7, weight: .heavy))
-                            .foregroundColor(color)
-                            .tracking(0.8)
-                            .padding(.horizontal, 4)
-                            .padding(.vertical, 1)
-                            .background(Capsule().fill(color.opacity(0.18)))
-                            .position(x: pos.x, y: max(4, pos.y - 34))
-                            .opacity(animate ? 1 : 0)
-                    }
-
-                    // Time label — only for anchors (avoid clutter)
-                    if isAnchorPt {
-                        Text(p.label)
-                            .font(.system(size: 10, weight: .semibold, design: .monospaced))
-                            .foregroundColor(isCurrent ? .white.opacity(0.9) : .white.opacity(0.45))
-                            .position(x: pos.x, y: h - 8)
-                            .opacity(animate ? 1 : 0)
-                            .animation(.easeOut(duration: 0.4).delay(0.5 + Double(i) * 0.03), value: animate)
-                    }
+                    pointMarker(index: i, pos: positions[i], point: p, h: h)
                 }
             }
         }
     }
 
-    private func levelName(_ aqi: Int) -> String {
-        switch aqi {
-        case 0..<51:    return "Good"
-        case 51..<101:  return "Moderate"
-        case 101..<151: return "USG"
-        case 151..<201: return "Unhealthy"
-        case 201..<301: return "V.Unhealthy"
-        default:        return "Hazardous"
+    @ViewBuilder
+    private func pointMarker(
+        index i: Int,
+        pos: CGPoint,
+        point p: ForecastSparklineCard.Point,
+        h: CGFloat
+    ) -> some View {
+        let color = info.colorForAQI(p.aqi)
+        let isCurrent = i == 0
+        let isAnchorPt = isAnchor(p)
+        let isPeak = isAnchorPt && p.aqi == peak?.aqi && p.label == peak?.label
+        let dotSize: CGFloat = isCurrent ? 14 : (isAnchorPt ? 11 : 5)
+
+        ZStack {
+            if isCurrent {
+                Circle()
+                    .stroke(color.opacity(0.4), lineWidth: 7)
+                    .frame(width: 26, height: 26)
+                    .scaleEffect(animate ? 1.3 : 0.8)
+                    .opacity(animate ? 0.0 : 0.9)
+                    .animation(
+                        .easeOut(duration: 1.8).repeatForever(autoreverses: false),
+                        value: animate
+                    )
+            }
+            Circle()
+                .fill(color)
+                .frame(width: dotSize, height: dotSize)
+                .shadow(color: color.opacity(isAnchorPt ? 0.8 : 0.4), radius: isAnchorPt ? 6 : 2)
+            if isAnchorPt {
+                Circle()
+                    .stroke(.white.opacity(isCurrent ? 0.95 : 0.35), lineWidth: 1.5)
+                    .frame(width: dotSize, height: dotSize)
+            }
         }
+        .position(pos)
+        .scaleEffect(animate ? 1 : 0)
+        .animation(
+            .spring(response: 0.5, dampingFraction: 0.7).delay(0.2 + Double(i) * 0.05),
+            value: animate
+        )
+
+        if isAnchorPt {
+            Text("\(p.aqi)")
+                .font(.system(size: 11, weight: .heavy, design: .rounded))
+                .foregroundColor(.white)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 2.5)
+                .background(
+                    Capsule()
+                        .fill(color.opacity(0.95))
+                        .shadow(color: color.opacity(0.5), radius: 4)
+                )
+                .position(x: pos.x, y: max(14, pos.y - 17))
+                .opacity(animate ? 1 : 0)
+                .scaleEffect(animate ? 1 : 0.6)
+                .animation(
+                    .spring(response: 0.4, dampingFraction: 0.7).delay(0.35 + Double(i) * 0.05),
+                    value: animate
+                )
+        }
+
+        if isPeak {
+            Text("PEAK")
+                .font(.system(size: 7, weight: .heavy, design: .monospaced))
+                .foregroundColor(color)
+                .tracking(1)
+                .padding(.horizontal, 5)
+                .padding(.vertical, 1.5)
+                .background(
+                    Capsule()
+                        .fill(color.opacity(0.18))
+                        .overlay(Capsule().stroke(color.opacity(0.4), lineWidth: 0.5))
+                )
+                .position(x: pos.x, y: max(6, pos.y - 36))
+                .opacity(animate ? 1 : 0)
+        }
+
+        if isAnchorPt {
+            Text(p.label)
+                .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                .foregroundColor(isCurrent ? .white.opacity(0.9) : .white.opacity(0.45))
+                .position(x: pos.x, y: h - 8)
+                .opacity(animate ? 1 : 0)
+                .animation(
+                    .easeOut(duration: 0.4).delay(0.5 + Double(i) * 0.03),
+                    value: animate
+                )
+        }
+    }
+
+    private func smoothPath(points pts: [CGPoint], closeBottom yBottom: CGFloat?) -> Path {
+        var path = Path()
+        guard let first = pts.first else { return path }
+        if let bottom = yBottom {
+            path.move(to: CGPoint(x: first.x, y: bottom))
+            path.addLine(to: first)
+        } else {
+            path.move(to: first)
+        }
+        for i in 1..<pts.count {
+            let prev = pts[i - 1]
+            let cur = pts[i]
+            let midX = (prev.x + cur.x) / 2
+            path.addCurve(
+                to: cur,
+                control1: CGPoint(x: midX, y: prev.y),
+                control2: CGPoint(x: midX, y: cur.y)
+            )
+        }
+        if let bottom = yBottom, let last = pts.last {
+            path.addLine(to: CGPoint(x: last.x, y: bottom))
+            path.closeSubpath()
+        }
+        return path
     }
 }
 

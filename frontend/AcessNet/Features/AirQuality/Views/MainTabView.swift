@@ -17,6 +17,7 @@ struct MainTabView: View {
         case map
         case fuel
         case health
+        case body
         case settings
     }
 
@@ -45,6 +46,9 @@ struct MainTabView: View {
                 case .health:
                     PPIDashboardView()
                         .id(Tab.health)
+                case .body:
+                    BodyScanHubView()
+                        .id(Tab.body)
                 case .settings:
                     SettingsView()
                         .id(Tab.settings)

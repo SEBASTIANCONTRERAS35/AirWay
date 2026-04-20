@@ -113,6 +113,33 @@ extension Color {
     /// Opacidad extra alta (90-95%)
     static let opacityExtraHigh: Double = 0.90
 
+    // MARK: - AirWay Design Tokens (sincronizados con la web)
+
+    /// Fondo base oscuro (navy casi negro)
+    static let awBg = Color(hex: "#060A18")
+    /// Fondo elevado (cards, sheets sobre el bg)
+    static let awBgElev = Color(hex: "#0D1427")
+    /// Primary marca (azul marino profundo)
+    static let awPrimary = Color(hex: "#0A1D4D")
+    /// Accent (cian vibrante, highlights interactivos)
+    static let awAccent = Color(hex: "#0099FF")
+    /// Superficie glass sobre fondo oscuro (~68% alpha)
+    static let awSurface = Color(hex: "#121A30").opacity(0.68)
+    /// Superficie hover/activa
+    static let awSurfaceHover = Color(hex: "#16203A").opacity(0.88)
+
+    /// Texto primario sobre fondo oscuro (blanco frío)
+    static let awInk = Color(hex: "#F5F9FF")
+    /// Texto secundario (subtítulos, etiquetas)
+    static let awInkSoft = Color(hex: "#C5CDE0")
+    /// Texto terciario (hints, metadata)
+    static let awInkMuted = Color(hex: "#8A95B5")
+
+    /// Borde sutil sobre superficies oscuras
+    static let awBorder = Color.white.opacity(0.08)
+    /// Borde más marcado (estados activos)
+    static let awBorderStrong = Color.white.opacity(0.16)
+
     // MARK: - Shadow Colors
 
     /// Sombra para elementos elevados (botones, cards)
@@ -154,6 +181,17 @@ extension LinearGradient {
         ],
         startPoint: .leading,
         endPoint: .trailing
+    )
+
+    /// Fondo base AirWay (siempre igual, independiente del clima)
+    static let airWayBase = LinearGradient(
+        stops: [
+            .init(color: Color.awBg,      location: 0.00),
+            .init(color: Color.awBgElev,  location: 0.45),
+            .init(color: Color.awPrimary, location: 1.00)
+        ],
+        startPoint: .top,
+        endPoint: .bottom
     )
 
     /// Gradiente para glassmorphism (elementos con efecto de vidrio)

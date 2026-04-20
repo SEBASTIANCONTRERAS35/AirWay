@@ -24,9 +24,18 @@ extension EnvironmentValues {
 
 struct WeatherTheme {
     let condition: WeatherCondition
+    /// Si true, ignora la condición climática y usa la paleta de marca AirWay (sincronizada con la página web).
+    let isAirWay: Bool
+
+    init(condition: WeatherCondition = .overcast, isAirWay: Bool = false) {
+        self.condition = condition
+        self.isAirWay = isAirWay
+    }
 
     // Card background
     var cardColor: Color {
+        // AirWay surface: #121A30 @ 68% (sincronizado con --color-aw-surface de la web)
+        if isAirWay { return Color(hex: "#121A30").opacity(0.68) }
         switch condition {
         case .sunny:  return Color(hex: "#1E3858")
         case .cloudy: return Color(hex: "#282E3E")
@@ -38,6 +47,7 @@ struct WeatherTheme {
 
     // Card border
     var borderColor: Color {
+        if isAirWay { return .white.opacity(0.08) }
         switch condition {
         case .sunny:  return .white.opacity(0.18)
         case .cloudy: return .white.opacity(0.12)
@@ -49,6 +59,7 @@ struct WeatherTheme {
 
     // Accent color
     var accent: Color {
+        if isAirWay { return Color(hex: "#0099FF") }
         switch condition {
         case .sunny:  return Color(hex: "#FFB830")
         case .cloudy: return Color(hex: "#8EACC0")
@@ -60,6 +71,7 @@ struct WeatherTheme {
 
     // Page background (for subviews without WeatherBackground)
     var pageBackground: Color {
+        if isAirWay { return Color(hex: "#060A18") }
         switch condition {
         case .sunny:  return Color(hex: "#0E1E30")
         case .cloudy: return Color(hex: "#0E1218")
@@ -71,6 +83,7 @@ struct WeatherTheme {
 
     // Text tint (subtle warm/cool shift)
     var textTint: Color {
+        if isAirWay { return Color(hex: "#F5F9FF") }
         switch condition {
         case .sunny:  return Color(hex: "#FFF5E0")
         case .cloudy: return .white

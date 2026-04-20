@@ -11,6 +11,8 @@ import SwiftUI
 
 struct WeatherBackground: View {
     let condition: WeatherCondition
+    /// Si true, usa la paleta de marca AirWay (navy + acento cian) en vez de la lógica por clima.
+    var isAirWay: Bool = false
     @State private var cloudOffset: CGFloat = -100
 
     var body: some View {
@@ -20,9 +22,20 @@ struct WeatherBackground: View {
 
             // Layer 2: Vignette sutil para profundidad
             RadialGradient(colors: [.clear, .black.opacity(0.35)], center: .center, startRadius: 150, endRadius: 500)
+
+            // Layer 3 (solo AirWay): halo accent cian sutil en la esquina superior derecha
+            if isAirWay {
+                RadialGradient(
+                    colors: [Color(hex: "#0099FF").opacity(0.22), .clear],
+                    center: .topTrailing,
+                    startRadius: 40,
+                    endRadius: 380
+                )
+            }
         }
         .ignoresSafeArea()
         .animation(.easeInOut(duration: 2.0), value: condition)
+        .animation(.easeInOut(duration: 0.45), value: isAirWay)
     }
 
     // MARK: - Particle Layer
@@ -48,6 +61,10 @@ struct WeatherBackground: View {
     // MARK: - Gradients
 
     private var gradientColors: [Color] {
+        // AirWay: paleta de marca (sincronizada con la página web — bg / bgElev / primary)
+        if isAirWay {
+            return [Color(hex: "#060A18"), Color(hex: "#0D1427"), Color(hex: "#0A1D4D")]
+        }
         switch condition {
         case .sunny:  return [Color(hex: "#1A3050"), Color(hex: "#2A5080"), Color(hex: "#183060")]
         case .cloudy: return [Color(hex: "#1A2235"), Color(hex: "#253045"), Color(hex: "#141A28")]
