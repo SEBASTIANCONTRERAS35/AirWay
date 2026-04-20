@@ -75,6 +75,22 @@ class AppSettings: ObservableObject {
         set { weatherOverrideRaw = newValue?.rawValue ?? "" }
     }
 
+    /// Tema AirWay: paleta de marca (sincronizada con la página web).
+    /// Se almacena como un valor sentinel dentro de `weatherOverrideRaw` para
+    /// no añadir un @AppStorage nuevo y mantener exclusividad con los temas de clima.
+    static let airWayThemeKey = "airWay"
+
+    var isAirWayTheme: Bool {
+        get { weatherOverrideRaw == Self.airWayThemeKey }
+        set {
+            if newValue {
+                weatherOverrideRaw = Self.airWayThemeKey
+            } else if weatherOverrideRaw == Self.airWayThemeKey {
+                weatherOverrideRaw = ""
+            }
+        }
+    }
+
     // MARK: - General Preferences
 
     /// Unidad de distancia preferida

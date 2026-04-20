@@ -14,6 +14,7 @@ enum TabTheme {
     case map
     case fuel
     case health
+    case body
     case settings
 
     var icon: String {
@@ -22,6 +23,7 @@ enum TabTheme {
         case .map: return "map.fill"
         case .fuel: return "fuelpump.fill"
         case .health: return "heart.text.clipboard.fill"
+        case .body: return "figure.arms.open"
         case .settings: return "gearshape.fill"
         }
     }
@@ -32,6 +34,7 @@ enum TabTheme {
         case .map: return "Map"
         case .fuel: return "Fuel"
         case .health: return "Health"
+        case .body: return "Body"
         case .settings: return "Settings"
         }
     }
@@ -44,7 +47,7 @@ struct EnhancedTabBar: View {
     @Namespace private var namespace
     @State private var showLabel = false
 
-    let tabs: [MainTabView.Tab] = [.home, .map, .fuel, .health, .settings]
+    let tabs: [MainTabView.Tab] = [.home, .map, .fuel, .health, .body, .settings]
 
     var body: some View {
         HStack(spacing: 6) {
@@ -117,7 +120,7 @@ struct EnhancedTabBar: View {
                 )
         )
         .clipShape(Capsule())
-        .padding(.horizontal, 40)
+        .padding(.horizontal, 20)
         .padding(.bottom, 28)
         .shadow(color: .black.opacity(0.3), radius: 16, x: 0, y: 8)
     }
@@ -128,6 +131,7 @@ struct EnhancedTabBar: View {
         case .map: return .map
         case .fuel: return .fuel
         case .health: return .health
+        case .body: return .body
         case .settings: return .settings
         }
     }
