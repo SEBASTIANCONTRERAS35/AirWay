@@ -12,14 +12,10 @@ import os
 struct GasolinaMeterHubView: View {
     @EnvironmentObject var appSettings: AppSettings
     @StateObject private var vehicleService = VehicleProfileService.shared
-    @StateObject private var telemetry = DrivingTelemetryService.shared
 
     @State private var showingVehicleProfile = false
     @State private var showingVehicleScan = false
-    @State private var showingTripRecorder = false
     @State private var showingOBD2 = false
-    @State private var showingModeComparison = false
-    @State private var showingOptimalDeparture = false
     @State private var showingStations = false
 
     // Coordenadas demo CDMX (Zócalo → Polanco)
@@ -50,63 +46,17 @@ struct GasolinaMeterHubView: View {
 
                         VehicleProfilePreviewCard(
                             onExpand: { showingVehicleProfile = true },
-                            onAdd: { showingVehicleProfile = true }
+                            onAdd: { showingVehicleProfile = true },
+                            onConnectOBD: {
+                                OBD2Service.shared.scan()
+                                showingOBD2 = true
+                            }
                         )
 
                         FuelStationsPreviewCard(
                             origin: demoOrigin,
                             onExpand: { showingStations = true }
                         )
-
-                        HStack(alignment: .top, spacing: 10) {
-                            CompareModesPreviewCard(
-                                origin: demoOrigin,
-                                destination: demoDestination,
-                                vehicle: vehicleService.activeProfile,
-                                onExpand: { showingModeComparison = true }
-                            )
-                            .frame(maxWidth: .infinity)
-
-                            OptimalDeparturePreviewCard(
-                                onExpand: { showingOptimalDeparture = true }
-                            )
-                            .frame(maxWidth: .infinity)
-                        }
-
-                        phaseSection(
-                            number: "5",
-                            title: "Telemetría",
-                            subtitle: "CoreMotion + GPS durante viaje",
-                            icon: "waveform.path.ecg",
-                            color: .red
-                        ) {
-                            PhaseRow(
-                                icon: telemetry.isRecording ? "record.circle.fill" : "play.circle.fill",
-                                title: telemetry.isRecording ? "Viaje en curso" : "Registrar viaje",
-                                subtitle: telemetry.isRecording
-                                    ? "\(Int(telemetry.liveStats.speedKmh)) km/h · \(String(format: "%.1f", telemetry.liveStats.distanceKm)) km"
-                                    : "Sin hardware · acelerómetro + GPS",
-                                theme: theme,
-                                isActive: telemetry.isRecording,
-                                action: { showingTripRecorder = true }
-                            )
-                        }
-
-                        phaseSection(
-                            number: "6",
-                            title: "Hardware Premium",
-                            subtitle: "OBD-II Bluetooth ELM327",
-                            icon: "antenna.radiowaves.left.and.right",
-                            color: .teal
-                        ) {
-                            PhaseRow(
-                                icon: "dot.radiowaves.left.and.right",
-                                title: "Conectar dongle",
-                                subtitle: "RPM · velocidad · L/hr en vivo",
-                                theme: theme,
-                                action: { showingOBD2 = true }
-                            )
-                        }
 
                         Spacer(minLength: 20)
                     }
@@ -121,29 +71,7 @@ struct GasolinaMeterHubView: View {
         .environment(\.weatherTheme, theme)
         .sheet(isPresented: $showingVehicleProfile) { VehicleProfileView() }
         .sheet(isPresented: $showingVehicleScan) { VehicleScanView() }
-        .sheet(isPresented: $showingTripRecorder) {
-            NavigationStack { TripRecorderView().navigationTitle("Viaje") }
-        }
         .sheet(isPresented: $showingOBD2) { OBD2ConnectionView() }
-        .sheet(isPresented: $showingModeComparison) {
-            ModeComparisonSheet(
-                origin: demoOrigin,
-                destination: demoDestination,
-                vehicle: vehicleService.activeProfile
-            )
-        }
-        .sheet(isPresented: $showingOptimalDeparture) {
-            if let vehicle = vehicleService.activeProfile {
-                OptimalDepartureView(
-                    origin: demoOrigin,
-                    destination: demoDestination,
-                    vehicle: vehicle,
-                    userProfile: nil
-                )
-            } else {
-                NoVehicleHintView()
-            }
-        }
         .fullScreenCover(isPresented: $showingStations) {
             FuelStationsMapView(origin: demoOrigin)
                 .environment(\.weatherTheme, theme)

@@ -129,8 +129,13 @@ struct AnatomicalModelView: UIViewRepresentable {
             indexAnatomyNodes(fallback)
             snapshotInitialCamera(fallback)
             DispatchQueue.main.async { [weak self] in
-                self?.onLoadError(
-                    String(localized: "Asset anatómico no encontrado. Usando modelo de respaldo.")
+                guard let self else { return }
+                if !self.didReportReady {
+                    self.didReportReady = true
+                    self.onModelReady()
+                }
+                self.onFallbackNotice(
+                    String(localized: "Usando modelo de respaldo. Añade anatomy_body.usdz al bundle para el asset completo.")
                 )
             }
             return fallback
