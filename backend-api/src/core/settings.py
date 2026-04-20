@@ -107,6 +107,15 @@ else:
 CORS_ALLOWED_ORIGINS = os.getenv('CORS_ALLOWED_ORIGINS', 'http://localhost:3000,http://localhost:5173,http://127.0.0.1:3000,http://127.0.0.1:5173').split(',')
 CORS_ALLOW_ALL_ORIGINS = os.getenv('CORS_ALLOW_ALL', 'false').lower() == 'true'
 
+# Regex origins — configurable via CORS_ALLOWED_ORIGIN_REGEXES (comma-separated).
+# Default covers any *.vercel.app preview and production deploys.
+CORS_ALLOWED_ORIGIN_REGEXES = [
+    r.strip() for r in os.getenv(
+        'CORS_ALLOWED_ORIGIN_REGEXES',
+        r'^https://([a-z0-9-]+\.)?vercel\.app$,^https://([a-z0-9-]+\.)?netlify\.app$'
+    ).split(',') if r.strip()
+]
+
 REDIS_URL = os.getenv('REDIS_URL')
 if REDIS_URL:
     CACHES = {
