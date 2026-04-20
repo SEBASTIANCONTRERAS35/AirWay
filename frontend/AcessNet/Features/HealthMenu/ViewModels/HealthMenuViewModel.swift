@@ -60,8 +60,17 @@ final class HealthMenuViewModel {
         loadError = nil
     }
 
+    /// Error duro: el modelo no puede renderizar. `isModelReady` queda en false
+    /// y la UI muestra el estado de error bloqueante.
     func handleLoadError(_ message: String) {
         isModelReady = false
+        loadError = message
+    }
+
+    /// Warning informativo: el USDZ preferido no se encontró pero un modelo
+    /// de respaldo sí está renderizando. No bloquea la UI.
+    func handleFallbackNotice(_ message: String) {
+        isModelReady = true
         loadError = message
     }
 

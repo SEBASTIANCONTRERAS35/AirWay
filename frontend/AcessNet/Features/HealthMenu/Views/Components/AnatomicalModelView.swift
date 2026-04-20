@@ -28,13 +28,15 @@ struct AnatomicalModelView: UIViewRepresentable {
     let bodyState: BodyHealthState
     var onModelReady: () -> Void
     var onLoadError: (String) -> Void
+    var onFallbackNotice: (String) -> Void
     var onOrganPicked: (BodyHealthState.Organ) -> Void
 
     func makeCoordinator() -> Coordinator {
         Coordinator(
             onOrganPicked: onOrganPicked,
             onModelReady: onModelReady,
-            onLoadError: onLoadError
+            onLoadError: onLoadError,
+            onFallbackNotice: onFallbackNotice
         )
     }
 
@@ -87,6 +89,7 @@ struct AnatomicalModelView: UIViewRepresentable {
         private let onOrganPicked: (BodyHealthState.Organ) -> Void
         private let onModelReady: () -> Void
         private let onLoadError: (String) -> Void
+        private let onFallbackNotice: (String) -> Void
 
         /// Cache: nodo → órgano mapeado. Evita recalcular en cada tap.
         private var organByNode: [ObjectIdentifier: BodyHealthState.Organ] = [:]
@@ -97,11 +100,13 @@ struct AnatomicalModelView: UIViewRepresentable {
         init(
             onOrganPicked: @escaping (BodyHealthState.Organ) -> Void,
             onModelReady: @escaping () -> Void,
-            onLoadError: @escaping (String) -> Void
+            onLoadError: @escaping (String) -> Void,
+            onFallbackNotice: @escaping (String) -> Void
         ) {
             self.onOrganPicked = onOrganPicked
             self.onModelReady = onModelReady
             self.onLoadError = onLoadError
+            self.onFallbackNotice = onFallbackNotice
         }
 
         // MARK: Scene loading

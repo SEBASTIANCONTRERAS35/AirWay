@@ -134,19 +134,21 @@ struct HealthMenuView: View {
                         .stroke(.white.opacity(0.08), lineWidth: 1)
                 )
 
-            if let error = viewModel.loadError {
+            if let error = viewModel.loadError, viewModel.isModelReady == false {
                 errorState(message: error)
             } else {
-                BioDigitalHumanView(
+                AnatomicalModelView(
+                    modelName: "anatomy_body",
                     bodyState: viewModel.bodyState,
                     onModelReady: viewModel.handleModelReady,
                     onLoadError: viewModel.handleLoadError,
-                    onObjectPicked: viewModel.didPickObject
+                    onOrganPicked: viewModel.didSelectOrgan
                 )
                 .id(modelContainerRef)
                 .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
                 .accessibilityLabel(String(localized: "Modelo 3D del cuerpo humano. Toca un órgano para ver su estado."))
                 .overlay(loadingOverlay, alignment: .center)
+                .overlay(fallbackBanner, alignment: .top)
             }
 
             VStack {
@@ -160,6 +162,31 @@ struct HealthMenuView: View {
             .padding(14)
         }
         .frame(height: height)
+    }
+
+    /// Banner discreto cuando el modelo USDZ no existe y estamos en fallback.
+    /// La VM marca el error pero `isModelReady` queda `true` porque el modelo
+    /// de respaldo sí renderiza.
+    @ViewBuilder
+    private var fallbackBanner: some View {
+        if let error = viewModel.loadError, viewModel.isModelReady {
+            HStack(spacing: 8) {
+                Image(systemName: "info.circle.fill")
+                    .font(.system(size: 11, weight: .semibold))
+                Text(error)
+                    .font(.system(size: 10, weight: .semibold))
+                    .lineLimit(2)
+            }
+            .foregroundColor(Color(hex: "#F4B942"))
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .background(
+                Capsule()
+                    .fill(.black.opacity(0.55))
+                    .overlay(Capsule().stroke(Color(hex: "#F4B942").opacity(0.35), lineWidth: 1))
+            )
+            .padding(.top, 12)
+        }
     }
 
     @ViewBuilder
