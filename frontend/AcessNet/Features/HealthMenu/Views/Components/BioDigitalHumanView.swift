@@ -47,9 +47,12 @@ struct BioDigitalHumanView: UIViewRepresentable {
 
     func makeUIView(context: Context) -> UIView {
         #if HAS_HUMANKIT
-        let canvas = UIView()
+        // El SDK de BioDigital exige un frame inicial concreto (no `.zero`),
+        // de lo contrario el WebView interno no renderiza. Usamos las bounds
+        // de la pantalla como base; SwiftUI ajusta después via autoresizing.
+        let canvas = UIView(frame: UIScreen.main.bounds)
         canvas.backgroundColor = .clear
-        canvas.translatesAutoresizingMaskIntoConstraints = false
+        canvas.autoresizingMask = [.flexibleWidth, .flexibleHeight]
         context.coordinator.canvas = canvas
 
         // Si el SDK ya validó (app lleva tiempo abierta) → crear HKHuman

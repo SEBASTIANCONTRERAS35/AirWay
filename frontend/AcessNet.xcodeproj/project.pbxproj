@@ -499,10 +499,11 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = QF2R75VM2Y;
+				DEVELOPMENT_TEAM = QYUV8U45UV;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = AcessNet/Info.plist;
+				INFOPLIST_KEY_LSApplicationCategoryType = "";
 				INFOPLIST_KEY_NSCameraUsageDescription = "AcessNet usa la cámara para visualizar partículas PM2.5 en realidad aumentada y para escanear el cuerpo humano con LiDAR (body tracking 3D y mapeo de malla).";
 				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "Algorithm djisttra";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "\"Se necesita tu ubicación para mostrarla en el mapa.\"";
@@ -538,10 +539,11 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = QF2R75VM2Y;
+				DEVELOPMENT_TEAM = QYUV8U45UV;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = AcessNet/Info.plist;
+				INFOPLIST_KEY_LSApplicationCategoryType = "";
 				INFOPLIST_KEY_NSCameraUsageDescription = "AcessNet usa la cámara para visualizar partículas PM2.5 en realidad aumentada y para escanear el cuerpo humano con LiDAR (body tracking 3D y mapeo de malla).";
 				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "Algorithm djisttra";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "\"Se necesita tu ubicación para mostrarla en el mapa.\"";
@@ -578,7 +580,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
-				DEVELOPMENT_TEAM = QF2R75VM2Y;
+				DEVELOPMENT_TEAM = QYUV8U45UV;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "AirWay reads your health data to measure how air pollution affects your body.";
@@ -615,7 +617,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEBUG_INFORMATION_FORMAT = dwarf;
-				DEVELOPMENT_TEAM = QF2R75VM2Y;
+				DEVELOPMENT_TEAM = QYUV8U45UV;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "AirWay reads your health data to measure how air pollution affects your body.";
