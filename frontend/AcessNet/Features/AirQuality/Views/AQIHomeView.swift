@@ -215,21 +215,21 @@ struct AQIHomeView: View {
 
                 if let info = pressedPollutant {
                     PollutantDetailOverlay(info: info)
-                        .transition(.opacity.combined(with: .scale(scale: 0.92)))
+                        .transition(.opacity)
                         .zIndex(100)
                         .allowsHitTesting(false)
                 }
 
                 if let info = pressedForecast {
                     ForecastDetailOverlay(info: info)
-                        .transition(.opacity.combined(with: .scale(scale: 0.92)))
+                        .transition(.opacity)
                         .zIndex(100)
                         .allowsHitTesting(false)
                 }
 
                 if showExposure {
                     ExposureMapOverlay(isPresented: $showExposure)
-                        .transition(.opacity.combined(with: .scale(scale: 0.94)))
+                        .transition(.opacity)
                         .zIndex(100)
                 }
             }
@@ -1808,7 +1808,7 @@ struct AnimatedWeatherStat: View {
                 .font(.system(size: 13, weight: .bold, design: .rounded))
                 .foregroundStyle(
                     LinearGradient(
-                        colors: [.white, kind.primaryColor.opacity(0.85)],
+                        colors: [theme.textTint, kind.primaryColor.opacity(0.85)],
                         startPoint: .top,
                         endPoint: .bottom
                     )
@@ -1816,7 +1816,7 @@ struct AnimatedWeatherStat: View {
 
             Text(kind.label)
                 .font(.system(size: 8, weight: .medium))
-                .foregroundColor(theme.textTint.opacity(0.35))
+                .foregroundColor(theme.textTint.opacity(0.55))
         }
         .frame(maxWidth: .infinity)
         .onAppear { animate = true }
@@ -1931,14 +1931,14 @@ struct PollutantDetailOverlay: View {
 
     @State private var animateRing: Bool = false
     @State private var animateValue: Int = 0
+    @State private var appeared: Bool = false
 
     var body: some View {
         ZStack {
-            // Backdrop dimming
-            Rectangle()
-                .fill(.black.opacity(0.55))
+            // Backdrop único (una sola capa plana, evita re-renders progresivos)
+            (theme.isAirWay ? Color(hex: "#0A1D4D").opacity(0.35) : Color.black.opacity(0.65))
                 .ignoresSafeArea()
-                .background(.ultraThinMaterial.opacity(0.4))
+                .opacity(appeared ? 1 : 0)
 
             VStack(spacing: 18) {
                 // Header
@@ -1962,7 +1962,7 @@ struct PollutantDetailOverlay: View {
                 // Animated ring gauge
                 ZStack {
                     Circle()
-                        .stroke(.white.opacity(0.08), lineWidth: 10)
+                        .stroke(theme.textTint.opacity(0.10), lineWidth: 10)
 
                     Circle()
                         .trim(from: 0, to: animateRing ? info.percentage : 0)
@@ -2036,7 +2036,7 @@ struct PollutantDetailOverlay: View {
             .frame(maxWidth: 340)
             .background(
                 RoundedRectangle(cornerRadius: 28, style: .continuous)
-                    .fill(Color.black.opacity(0.78))
+                    .fill(theme.isAirWay ? Color.white.opacity(0.94) : Color.black.opacity(0.78))
                     .overlay(
                         RoundedRectangle(cornerRadius: 28, style: .continuous)
                             .stroke(
@@ -2048,11 +2048,16 @@ struct PollutantDetailOverlay: View {
                                 lineWidth: 1
                             )
                     )
-                    .shadow(color: info.color.opacity(0.35), radius: 32, y: 8)
+                    .shadow(color: info.color.opacity(theme.isAirWay ? 0.18 : 0.35), radius: 32, y: 8)
             )
             .padding(.horizontal, 24)
+            .scaleEffect(appeared ? 1.0 : 0.92)
+            .opacity(appeared ? 1 : 0)
         }
         .onAppear {
+            withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                appeared = true
+            }
             withAnimation(.easeOut(duration: 0.9)) {
                 animateRing = true
             }
@@ -2391,6 +2396,7 @@ struct ForecastDetailOverlay: View {
     let info: ForecastDetailInfo
 
     @State private var animate: Bool = false
+    @State private var appeared: Bool = false
 
     private var currentAQI: Int { info.points.first?.aqi ?? 0 }
     private var projectedAQI: Int { info.points.last?.aqi ?? currentAQI }
@@ -2478,11 +2484,10 @@ struct ForecastDetailOverlay: View {
 
     var body: some View {
         ZStack {
-            // Backdrop (same as Exposure overlay)
-            Rectangle()
-                .fill(.black.opacity(0.7))
+            // Backdrop único (evita capas de material que se cargan progresivamente)
+            (theme.isAirWay ? Color(hex: "#0A1D4D").opacity(0.35) : Color.black.opacity(0.75))
                 .ignoresSafeArea()
-                .background(.ultraThinMaterial.opacity(0.5))
+                .opacity(appeared ? 1 : 0)
 
             // Card
             VStack(alignment: .leading, spacing: 14) {
@@ -2498,15 +2503,22 @@ struct ForecastDetailOverlay: View {
             .frame(maxWidth: 360, alignment: .leading)
             .background(cardBackground)
             .padding(.horizontal, 16)
+            .scaleEffect(appeared ? 1.0 : 0.92)
+            .opacity(appeared ? 1 : 0)
         }
-        .onAppear { animate = true }
+        .onAppear {
+            animate = true
+            withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                appeared = true
+            }
+        }
     }
 
     // MARK: – Card background
 
     private var cardBackground: some View {
         RoundedRectangle(cornerRadius: 30, style: .continuous)
-            .fill(Color.black.opacity(0.85))
+            .fill(theme.isAirWay ? Color.white.opacity(0.94) : Color.black.opacity(0.85))
             .overlay(
                 RoundedRectangle(cornerRadius: 30, style: .continuous)
                     .stroke(
@@ -2521,7 +2533,7 @@ struct ForecastDetailOverlay: View {
                         lineWidth: 1
                     )
             )
-            .shadow(color: peakColor.opacity(0.25), radius: 40, y: 10)
+            .shadow(color: peakColor.opacity(theme.isAirWay ? 0.15 : 0.25), radius: 40, y: 10)
     }
 
     // MARK: – Sections
@@ -2537,7 +2549,7 @@ struct ForecastDetailOverlay: View {
                     .font(.system(size: 26, weight: .heavy, design: .rounded))
                     .foregroundStyle(
                         LinearGradient(
-                            colors: [.white, .white.opacity(0.72)],
+                            colors: [theme.textTint, theme.textTint.opacity(0.72)],
                             startPoint: .top,
                             endPoint: .bottom
                         )
@@ -3068,6 +3080,7 @@ struct ExposureMapOverlay: View {
     @Binding var isPresented: Bool
     @State private var camera: MapCameraPosition
     @State private var animate: Bool = false
+    @State private var appeared: Bool = false
 
     private let segments: [ExposureSegment]
     private let stops: [ExposureStop]
@@ -3174,10 +3187,9 @@ struct ExposureMapOverlay: View {
 
     var body: some View {
         ZStack {
-            Rectangle()
-                .fill(.black.opacity(0.7))
+            (theme.isAirWay ? Color(hex: "#0A1D4D").opacity(0.35) : Color.black.opacity(0.75))
                 .ignoresSafeArea()
-                .background(.ultraThinMaterial.opacity(0.5))
+                .opacity(appeared ? 1 : 0)
                 .contentShape(Rectangle())
                 .onTapGesture { close() }
 
@@ -3209,7 +3221,7 @@ struct ExposureMapOverlay: View {
             .frame(maxWidth: 420)
             .background(
                 RoundedRectangle(cornerRadius: 30, style: .continuous)
-                    .fill(Color.black.opacity(0.85))
+                    .fill(theme.isAirWay ? Color.white.opacity(0.94) : Color.black.opacity(0.85))
                     .overlay(
                         RoundedRectangle(cornerRadius: 30, style: .continuous)
                             .stroke(
@@ -3221,11 +3233,18 @@ struct ExposureMapOverlay: View {
                                 lineWidth: 1
                             )
                     )
-                    .shadow(color: .green.opacity(0.25), radius: 40, y: 10)
+                    .shadow(color: .green.opacity(theme.isAirWay ? 0.15 : 0.25), radius: 40, y: 10)
             )
             .padding(.horizontal, 16)
+            .scaleEffect(appeared ? 1.0 : 0.94)
+            .opacity(appeared ? 1 : 0)
         }
-        .onAppear { animate = true }
+        .onAppear {
+            animate = true
+            withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                appeared = true
+            }
+        }
     }
 
     private func close() {
@@ -3270,7 +3289,7 @@ struct ExposureMapOverlay: View {
                     Text(String(format: "%.1f", cigEquivalent))
                         .font(.system(size: 32, weight: .heavy, design: .rounded))
                         .foregroundStyle(
-                            LinearGradient(colors: [.white, .white.opacity(0.7)], startPoint: .top, endPoint: .bottom)
+                            LinearGradient(colors: [theme.textTint, theme.textTint.opacity(0.7)], startPoint: .top, endPoint: .bottom)
                         )
                     Text("cig equiv.")
                         .font(.system(size: 11, weight: .semibold))
@@ -3725,10 +3744,10 @@ struct DailyForecastCard: View {
         .padding(.vertical, 16)
         .background(
             RoundedRectangle(cornerRadius: 20)
-                .fill(.ultraThinMaterial.opacity(0.15))
+                .fill(theme.cardColor)
                 .overlay(
                     RoundedRectangle(cornerRadius: 20)
-                        .stroke(.white.opacity(0.08), lineWidth: 1)
+                        .stroke(theme.borderColor, lineWidth: 1)
                 )
         )
     }
@@ -3839,10 +3858,10 @@ struct HourlyForecastItem: View {
         .padding(.vertical, 12)
         .background(
             RoundedRectangle(cornerRadius: 15)
-                .fill(.ultraThinMaterial.opacity(0.15))
+                .fill(theme.cardColor)
                 .overlay(
                     RoundedRectangle(cornerRadius: 15)
-                        .stroke(.white.opacity(0.08), lineWidth: 1)
+                        .stroke(theme.borderColor, lineWidth: 1)
                 )
         )
     }
@@ -4060,8 +4079,8 @@ struct PMIndicator: View {
         .padding()
         .background(
             RoundedRectangle(cornerRadius: 16)
-                .fill(.ultraThinMaterial.opacity(0.15))
-                .overlay(RoundedRectangle(cornerRadius: 16).stroke(.white.opacity(0.08), lineWidth: 1))
+                .fill(theme.cardColor)
+                .overlay(RoundedRectangle(cornerRadius: 16).stroke(theme.borderColor, lineWidth: 1))
         )
     }
 }

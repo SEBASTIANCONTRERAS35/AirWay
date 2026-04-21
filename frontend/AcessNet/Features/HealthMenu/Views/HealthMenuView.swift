@@ -18,6 +18,12 @@ struct HealthMenuView: View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @State private var viewModel = HealthMenuViewModel()
     @State private var modelContainerRef: UUID = UUID()
+    @State private var showHeartDebugPanel: Bool = false
+    @State private var selectedPart: BodyPartFocus
+
+    init(initialFocus: BodyPartFocus = .heart) {
+        _selectedPart = State(initialValue: initialFocus)
+    }
 
     var body: some View {
         GeometryReader { geo in
@@ -25,21 +31,43 @@ struct HealthMenuView: View {
                 backgroundGradient
                     .ignoresSafeArea()
 
-                VStack(spacing: 16) {
-                    topBar
-                    AQIHeaderView(badge: viewModel.currentAQIBadge)
-                        .padding(.horizontal, 16)
+                ScrollView(showsIndicators: false) {
+                    VStack(spacing: 16) {
+                        topBar
+                        AQIHeaderView(badge: viewModel.currentAQIBadge)
+                            .padding(.horizontal, 16)
 
-                    modelContainer(height: modelHeight(in: geo))
-                        .padding(.horizontal, 16)
+                        modelContainer(height: modelHeight(in: geo))
+                            .padding(.horizontal, 16)
 
-                    treatmentsList
+                        bodyPartSelector
+                            .padding(.horizontal, 16)
+
+                        exposureCauses
+                            .padding(.horizontal, 16)
+
+                        treatmentsList
+                    }
+                    .padding(.top, safeTopPadding)
+                    .padding(.bottom, 16)
                 }
-                .padding(.top, safeTopPadding)
-                .padding(.bottom, 16)
+
+                // Debug slider: overlay en la parte baja de la pantalla (solo DEBUG)
+                #if DEBUG
+                VStack {
+                    Spacer()
+                    if showHeartDebugPanel {
+                        heartDebugPanel
+                            .padding(.horizontal, 18)
+                            .padding(.bottom, 24)
+                            .transition(.move(edge: .bottom).combined(with: .opacity))
+                    }
+                }
+                .animation(.spring(response: 0.4, dampingFraction: 0.85),
+                           value: showHeartDebugPanel)
+                #endif
             }
         }
-        .preferredColorScheme(.dark)
         .sheet(item: organBinding) { organ in
             OrganDetailSheet(
                 organ: organ,
@@ -53,6 +81,107 @@ struct HealthMenuView: View {
         }
     }
 
+    // MARK: - Exposure causes section
+
+    /// Tarjeta narrativa que explica por qué los órganos están así
+    /// (cigarrillos equivalentes, PM2.5 inhalado, horas en aire malo, etc.).
+    private var exposureCauses: some View {
+        let worstOrgan = BodyPartFocus.allCases.map { focus in
+            (focus, viewModel.bodyState.health(for: focus.organ).damageLevel)
+        }.max(by: { $0.1 < $1.1 })
+
+        return ExposureCausesCard(
+            cigarettes: viewModel.cigarettesEquivalentToday,
+            pm25DoseUg: viewModel.cumulativePM25DoseUg,
+            badAirHours: viewModel.hoursInBadAirToday,
+            heartRate: viewModel.currentHeartRate,
+            spO2: viewModel.currentSpO2,
+            aqi: viewModel.currentAQIBadge.aqi,
+            organWorstLabel: worstOrgan?.0.label ?? "cuerpo",
+            organWorstDamage: worstOrgan?.1 ?? 0
+        )
+    }
+
+    // MARK: - Heart debug panel (solo DEBUG)
+
+    #if DEBUG
+    /// Panel debug que se adapta al órgano en foco (corazón, pulmones, cerebro).
+    private var heartDebugPanel: some View {
+        let focus = selectedPart
+        let binding = Binding<Double>(
+            get: { viewModel.debugOverride(for: focus) ?? viewModel.bodyState.health(for: focus.organ).damageLevel },
+            set: { viewModel.setDebugOverride(for: focus, value: $0) }
+        )
+        let current = binding.wrappedValue
+        let severity = OrganHealth(damageLevel: current).severity
+
+        return VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                Image(systemName: focus.systemIcon)
+                    .foregroundColor(Color(hex: "#F4B942"))
+                Text("Debug · Deterioro \(focus.label.lowercased())")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundColor(.white)
+                Spacer()
+                Text(severity.label)
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundColor(colorForDamage(current))
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(
+                        Capsule()
+                            .fill(colorForDamage(current).opacity(0.18))
+                            .overlay(
+                                Capsule().stroke(colorForDamage(current).opacity(0.5), lineWidth: 1)
+                            )
+                    )
+                Button {
+                    viewModel.setDebugOverride(for: focus, value: nil)
+                } label: {
+                    Image(systemName: "arrow.counterclockwise")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundColor(.white.opacity(0.7))
+                }
+                .accessibilityLabel("Reset")
+            }
+
+            HStack(spacing: 10) {
+                Text("0")
+                    .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                    .foregroundColor(.white.opacity(0.4))
+                Slider(value: binding, in: 0...1)
+                    .tint(colorForDamage(current))
+                Text("1")
+                    .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                    .foregroundColor(.white.opacity(0.4))
+                Text(String(format: "%.2f", current))
+                    .font(.system(size: 11, weight: .bold, design: .monospaced))
+                    .foregroundColor(.white)
+                    .frame(width: 42)
+            }
+        }
+        .padding(14)
+        .background(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(.ultraThinMaterial)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .stroke(.white.opacity(0.1), lineWidth: 1)
+                )
+        )
+    }
+
+    private func colorForDamage(_ d: Double) -> Color {
+        switch d {
+        case ..<0.25: return Color(hex: "#4ADE80")
+        case ..<0.45: return Color(hex: "#F4B942")
+        case ..<0.65: return Color(hex: "#FF8A3D")
+        case ..<0.85: return Color(hex: "#FF5B5B")
+        default:      return Color(hex: "#8B5CF6")
+        }
+    }
+    #endif
+
     // MARK: - Layout helpers
 
     private var safeTopPadding: CGFloat { 12 }
@@ -63,16 +192,24 @@ struct HealthMenuView: View {
         return horizontalSizeClass == .regular ? base + 40 : base
     }
 
+    /// Background dinámico que respeta el WeatherTheme activo (sunny / cloudy /
+    /// overcast / rainy / stormy). Fallback al gradient oscuro por si el tema
+    /// no provee pageBackground.
     private var backgroundGradient: some View {
-        LinearGradient(
-            colors: [
-                Color(hex: "#0A0A0F"),
-                Color(hex: "#13141B"),
-                Color(hex: "#0A0A0F")
-            ],
-            startPoint: .top,
-            endPoint: .bottom
-        )
+        ZStack {
+            theme.pageBackground.ignoresSafeArea()
+            // Overlay sutil con el tinte del tema para dar profundidad
+            LinearGradient(
+                colors: [
+                    Color.clear,
+                    theme.accent.opacity(0.04),
+                    Color.clear
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .ignoresSafeArea()
+        }
     }
 
     // MARK: - Top bar
@@ -104,22 +241,41 @@ struct HealthMenuView: View {
                     .font(.system(size: 15, weight: .bold, design: .rounded))
                     .foregroundStyle(
                         LinearGradient(
-                            colors: [.white, Color(hex: "#7DD3FC")],
+                            colors: [theme.textTint, theme.accent],
                             startPoint: .leading,
                             endPoint: .trailing
                         )
                     )
                 Text(String(localized: "Diagnóstico ambiental"))
                     .font(.system(size: 9, weight: .semibold))
-                    .foregroundColor(theme.textTint.opacity(0.5))
+                    .foregroundColor(theme.textTint.opacity(0.6))
                     .tracking(1.2)
                     .textCase(.uppercase)
             }
 
             Spacer()
 
+            #if DEBUG
+            Button {
+                withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
+                    showHeartDebugPanel.toggle()
+                }
+            } label: {
+                Image(systemName: showHeartDebugPanel ? "ladybug.fill" : "ladybug")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundColor(showHeartDebugPanel ? Color(hex: "#F4B942") : .white.opacity(0.7))
+                    .frame(width: 32, height: 32)
+                    .background(
+                        Circle()
+                            .fill(.ultraThinMaterial)
+                            .overlay(Circle().stroke(.white.opacity(0.1), lineWidth: 1))
+                    )
+            }
+            .accessibilityLabel("Toggle heart debug slider")
+            #else
             // Placeholder para equilibrar el chevron izquierdo.
             Color.clear.frame(width: 72, height: 32)
+            #endif
         }
         .padding(.horizontal, 16)
     }
@@ -168,6 +324,7 @@ struct HealthMenuView: View {
         if BioDigitalConfig.isConfigured {
             BioDigitalHumanView(
                 bodyState: viewModel.bodyState,
+                focus: selectedPart,
                 onModelReady: viewModel.handleModelReady,
                 onLoadError: viewModel.handleLoadError,
                 onObjectPicked: viewModel.didPickObject
@@ -178,6 +335,59 @@ struct HealthMenuView: View {
         #else
         anatomicalFallback
         #endif
+    }
+
+    // MARK: - Body part selector (segmented con corazón / pulmones / cerebro)
+
+    private var bodyPartSelector: some View {
+        HStack(spacing: 6) {
+            ForEach(BodyPartFocus.allCases) { part in
+                bodyPartButton(part)
+            }
+        }
+        .padding(4)
+        .background(
+            Capsule()
+                .fill(.black.opacity(0.35))
+                .overlay(Capsule().stroke(.white.opacity(0.08), lineWidth: 1))
+                .background(Capsule().fill(.ultraThinMaterial))
+        )
+        .clipShape(Capsule())
+    }
+
+    private func bodyPartButton(_ part: BodyPartFocus) -> some View {
+        let isSelected = selectedPart == part
+        let damage = viewModel.bodyState.health(for: part.organ).damageLevel
+        let severity = OrganHealth(damageLevel: damage).severity
+
+        return Button {
+            HapticFeedback.light()
+            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                selectedPart = part
+            }
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: part.systemIcon)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(severity.tint)
+                Text(part.label)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(isSelected ? .white : .white.opacity(0.7))
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 9)
+            .background(
+                Group {
+                    if isSelected {
+                        Capsule()
+                            .fill(.white.opacity(0.14))
+                            .overlay(Capsule().stroke(.white.opacity(0.12), lineWidth: 1))
+                    }
+                }
+            )
+        }
+        .buttonStyle(PlainButtonStyle())
+        .accessibilityLabel("\(part.label) · \(severity.label)")
     }
 
     private var anatomicalFallback: some View {

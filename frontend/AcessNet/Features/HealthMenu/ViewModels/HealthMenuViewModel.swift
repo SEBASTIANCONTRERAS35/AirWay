@@ -31,6 +31,13 @@ final class HealthMenuViewModel {
     var isLiveData: Bool = false
     var selectedOrgan: BodyHealthState.Organ?
 
+    /// Overrides manuales por órgano para debug/demo (solo builds DEBUG).
+    /// Si es != nil, sobrescriben el valor calculado desde biometría.
+    var debugHeartOverride: Double? = nil
+    var debugLungsOverride: Double? = nil
+    var debugBrainOverride: Double? = nil
+
+
     var currentAQIBadge: AQIBadge
 
     struct AQIBadge: Equatable {
@@ -90,11 +97,106 @@ final class HealthMenuViewModel {
     /// almacenado, y recomputa BodyHealthState + tratamientos.
     func recompute() {
         let input = currentInput()
-        bodyState = PPIToBodyHealthMapper.map(input)
+        var state = PPIToBodyHealthMapper.map(input)
+
+        // Overrides manuales (debug slider) tienen precedencia sobre biometría.
+        let heart = debugHeartOverride.map { OrganHealth(damageLevel: $0,
+                                                         activeConditions: state.heart.activeConditions) }
+            ?? state.heart
+        let lungs = debugLungsOverride.map { OrganHealth(damageLevel: $0,
+                                                         activeConditions: state.lungs.activeConditions) }
+            ?? state.lungs
+        let brain = debugBrainOverride.map { OrganHealth(damageLevel: $0,
+                                                         activeConditions: state.brain.activeConditions) }
+            ?? state.brain
+
+        state = BodyHealthState(
+            lungs: lungs,
+            nose: state.nose,
+            brain: brain,
+            throat: state.throat,
+            heart: heart,
+            skin: state.skin
+        )
+
+        bodyState = state
         treatments = PPIToBodyHealthMapper.treatments(for: bodyState, input: input)
         currentAQIBadge = Self.badge(from: input.aqi)
         isLiveData = connectivity.latestPPIScore != nil
             || connectivity.latestBiometrics != nil
+    }
+
+    /// Aplicados desde el slider de debug. Disparan un recompute inmediato.
+    func setHeartDebugOverride(_ value: Double?) {
+        debugHeartOverride = value
+        recompute()
+    }
+
+    func setLungsDebugOverride(_ value: Double?) {
+        debugLungsOverride = value
+        recompute()
+    }
+
+    func setBrainDebugOverride(_ value: Double?) {
+        debugBrainOverride = value
+        recompute()
+    }
+
+    /// Helper genérico para el panel debug polimórfico.
+    func setDebugOverride(for focus: BodyPartFocus, value: Double?) {
+        switch focus {
+        case .heart: setHeartDebugOverride(value)
+        case .lungs: setLungsDebugOverride(value)
+        case .brain: setBrainDebugOverride(value)
+        }
+    }
+
+    // MARK: - Exposure causes (datos narrativos para UI)
+
+    /// Cigarrillos equivalentes fumados hoy por exposición a PM2.5.
+    /// Si hay `CigaretteData` del Watch, lo usamos directo. Si no, estimamos
+    /// asumiendo 8h de exposición al AQI actual (≈ 1 cig cada 22 µg/m³).
+    var cigarettesEquivalentToday: Double {
+        if let cig = connectivity.latestCigaretteData?.cigarettesToday, cig > 0 {
+            return cig
+        }
+        let pm25 = PPIToBodyHealthMapper.Input.demoFallback.aqi?.pm25 ?? 35
+        return min((pm25 / 22.0) * (8.0 / 24.0), 5.0) // estimado suave
+    }
+
+    /// Dosis PM2.5 acumulada en µg (microgramos inhalados).
+    var cumulativePM25DoseUg: Double {
+        connectivity.latestCigaretteData?.cumulativeDoseUg ?? {
+            let pm25 = PPIToBodyHealthMapper.Input.demoFallback.aqi?.pm25 ?? 35
+            return pm25 * 8 // µg × horas estimadas
+        }()
+    }
+
+    /// Horas estimadas en aire con AQI > 100 hoy.
+    var hoursInBadAirToday: Double {
+        guard let aqi = PPIToBodyHealthMapper.Input.demoFallback.aqi?.aqi else { return 0 }
+        if aqi > 150 { return 8.0 }
+        if aqi > 100 { return 4.5 }
+        if aqi > 50  { return 1.5 }
+        return 0.0
+    }
+
+    /// HR actual del Watch (si disponible) o demo.
+    var currentHeartRate: Double? {
+        connectivity.latestBiometrics?.heartRate
+    }
+
+    /// SpO2 actual del Watch.
+    var currentSpO2: Double? {
+        connectivity.latestBiometrics?.spO2
+    }
+
+    func debugOverride(for focus: BodyPartFocus) -> Double? {
+        switch focus {
+        case .heart: return debugHeartOverride
+        case .lungs: return debugLungsOverride
+        case .brain: return debugBrainOverride
+        }
     }
 
     private func currentInput() -> PPIToBodyHealthMapper.Input {

@@ -51,7 +51,7 @@ struct BodyHealthState: Equatable, Hashable, Codable {
         lungs: OrganHealth(damageLevel: 0.34, activeConditions: [.pm25Exposure, .no2Exposure]),
         nose: OrganHealth(damageLevel: 0.45, activeConditions: [.rhinitis]),
         brain: OrganHealth(damageLevel: 0.28, activeConditions: [.migraine]),
-        throat: OrganHealth(damageLevel: 0.22, activeConditions: [.bronchialIrritation]),
+        throat: OrganHealth(damageLevel: 0.7, activeConditions: [.bronchialIrritation]),
         heart: OrganHealth(damageLevel: 0.15, activeConditions: []),
         skin: OrganHealth(damageLevel: 0.10, activeConditions: [])
     )

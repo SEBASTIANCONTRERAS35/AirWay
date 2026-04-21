@@ -33,6 +33,17 @@ import HumanKit
 struct BioDigitalHumanView: UIViewRepresentable {
 
     var bodyState: BodyHealthState
+    /// Órgano actualmente en foco (corazón / pulmones / cerebro).
+    var focus: BodyPartFocus = .heart
+    /// Si `true`, aplica `Visualizer` según el damage del órgano en foco.
+    /// `false` deja el modelo con sus colores nativos (útil para el atlas).
+    var applyTinting: Bool = true
+    /// Si se especifica, carga este modelo en vez del derivado del `focus`.
+    /// Permite al atlas mostrar un modelo genérico distinto de los 3 órganos.
+    var explicitModelId: String? = nil
+    /// Cola completa de modelos a probar. Si se especifica, toma precedencia
+    /// sobre `explicitModelId`. Útil cuando el sistema tiene varios fallbacks.
+    var explicitModelQueue: [String]? = nil
     var onModelReady: () -> Void
     var onLoadError: (String) -> Void
     var onObjectPicked: (String) -> Void
@@ -75,8 +86,20 @@ struct BioDigitalHumanView: UIViewRepresentable {
 
     func updateUIView(_ uiView: UIView, context: Context) {
         context.coordinator.bodyState = bodyState
+        context.coordinator.applyTinting = applyTinting
         #if HAS_HUMANKIT
-        context.coordinator.applyBodyStateIfReady()
+        let queueChanged = context.coordinator.explicitModelQueue != explicitModelQueue
+        let idChanged = context.coordinator.explicitModelId != explicitModelId
+        if queueChanged || idChanged {
+            context.coordinator.explicitModelQueue = explicitModelQueue
+            context.coordinator.explicitModelId = explicitModelId
+            context.coordinator.reloadForCurrentFocus()
+        } else if context.coordinator.focus != focus {
+            context.coordinator.focus = focus
+            context.coordinator.reloadForCurrentFocus()
+        } else {
+            context.coordinator.applyBodyStateIfReady()
+        }
         #endif
     }
 
@@ -134,11 +157,20 @@ extension BioDigitalHumanView {
 
         weak var canvas: UIView?
         var bodyState: BodyHealthState?
+        var focus: BodyPartFocus = .heart
+        var applyTinting: Bool = true
+        var explicitModelId: String? = nil
+        var explicitModelQueue: [String]? = nil
         var modelDidLoad: Bool = false
 
         /// Cola de modelos a intentar. Si el primario falla con `modelLoadError`,
         /// probamos el siguiente automáticamente.
         private var pendingModelIds: [String] = []
+
+        /// Identifica el intento de carga actual. Se usa para que un timeout
+        /// no dispare un fallback si ya se recibió `modelLoaded` o el usuario
+        /// cambió de sistema a mitad de carga.
+        fileprivate var currentLoadAttempt: UUID?
 
         #if HAS_HUMANKIT
         var human: HKHuman?
@@ -188,16 +220,40 @@ extension BioDigitalHumanView {
         #if HAS_HUMANKIT
 
         /// Crea `HKHuman` y dispara el load del modelo si aún no se ha hecho.
+        /// Si se especifica `explicitModelId` → lo usa primero. Si no, usa el
+        /// modelo derivado del `focus` (órgano específico).
         func attachHumanIfNeeded() {
             guard human == nil, let canvas else { return }
 
-            print("🩺 [BioDigital] SDK válido — creando HKHuman y cargando modelo")
-            let body = HKHuman(view: canvas)
+            print("🩺 [BioDigital] SDK válido — creando HKHuman")
+            // Ocultamos todo el UI nativo del SDK (menú, tools, info, help,
+            // object tree, reset, animation controls, tour) para que solo
+            // se vea el modelo 3D limpio. Nuestra UI custom provee navegación.
+            let uiOptions: [HumanUIOptions: Bool] = [
+                .all: false,
+                .tools: false,
+                .info: false,
+                .animation: false,
+                .tour: false,
+                .help: false,
+                .objectTree: false,
+                .reset: false
+            ]
+            let body = HKHuman(view: canvas, options: uiOptions)
             body.delegate = self
             self.human = body
 
-            // Inicializar cola: modelo primario + fallbacks.
-            pendingModelIds = [BioDigitalConfig.defaultModelId] + BioDigitalConfig.fallbackModelIds
+            // Refuerzo por si el init con options no desactiva todos los elementos.
+            body.setupUI(option: .all, value: false)
+            body.setupUI(option: .tools, value: false)
+            body.setupUI(option: .info, value: false)
+            body.setupUI(option: .help, value: false)
+            body.setupUI(option: .objectTree, value: false)
+            body.setupUI(option: .reset, value: false)
+            body.setupUI(option: .animation, value: false)
+            body.setupUI(option: .tour, value: false)
+
+            pendingModelIds = buildModelQueue()
 
             // El ejemplo oficial de BioDigital inserta un delay de 1s para
             // dar tiempo a que el WebView interno del SDK termine de configurarse.
@@ -206,8 +262,40 @@ extension BioDigitalHumanView {
             }
         }
 
+        /// Recarga el modelo cuando el usuario cambia de foco/sistema.
+        func reloadForCurrentFocus() {
+            guard let human else {
+                attachHumanIfNeeded()
+                return
+            }
+            modelDidLoad = false
+            pendingModelIds = buildModelQueue()
+            let primary = pendingModelIds.first ?? focus.primaryModelId
+            print("🩺 [BioDigital] recargando modelo → \(primary)")
+            pendingModelIds.removeFirst()
+            human.load(model: primary)
+        }
+
+        /// Construye la cola de modelos respetando cualquier override del atlas.
+        /// Orden de precedencia:
+        ///   1. `explicitModelQueue` (lista completa del sistema con fallbacks)
+        ///   2. `explicitModelId` (modelo único)
+        ///   3. `focus.modelQueue` (órgano del diagnóstico)
+        /// + fallbacks generales al final.
+        private func buildModelQueue() -> [String] {
+            if let queue = explicitModelQueue, !queue.isEmpty {
+                return queue + focus.modelQueue + BioDigitalConfig.fallbackModelIds
+            }
+            if let explicit = explicitModelId {
+                return [explicit] + focus.modelQueue + BioDigitalConfig.fallbackModelIds
+            }
+            return focus.modelQueue + BioDigitalConfig.fallbackModelIds
+        }
+
         /// Intenta cargar el siguiente modelo de la cola. Si falla, se encadena
-        /// desde `human(_:modelLoadError:)`.
+        /// desde `human(_:modelLoadError:)`. Incluye un timeout de 8s porque
+        /// algunos modelos del tier developer se quedan colgados silenciosamente
+        /// sin disparar `modelLoadError`.
         func loadNextModel() {
             guard let human else { return }
             guard let next = pendingModelIds.first else {
@@ -216,29 +304,30 @@ extension BioDigitalHumanView {
                 return
             }
             pendingModelIds.removeFirst()
+            let attemptId = UUID()
+            currentLoadAttempt = attemptId
+            modelDidLoad = false
             print("🩺 [BioDigital] load(model: \(next)) — quedan \(pendingModelIds.count) fallbacks")
             human.load(model: next)
+
+            // Timeout: si en 8s no se reportó `modelLoaded` ni `modelLoadError`,
+            // asumimos que el modelo no es accesible y probamos el siguiente.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 8.0) { [weak self] in
+                guard let self, self.currentLoadAttempt == attemptId else { return }
+                guard !self.modelDidLoad else { return }
+                print("🩺 [BioDigital] ⏱ timeout cargando \(next) — probando fallback")
+                self.loadNextModel()
+            }
         }
 
         func applyBodyStateIfReady() {
             guard modelDidLoad, let human, let state = bodyState else { return }
+            guard applyTinting else { return } // atlas usa colores nativos
 
-            for organ in BodyHealthState.Organ.allCases {
-                let health = state.health(for: organ)
-                let rgba = BioDigitalOrganMapper.highlightColor(for: health.damageLevel)
-                let color = HKColor()
-                color.tint = UIColor(
-                    red: CGFloat(rgba.red),
-                    green: CGFloat(rgba.green),
-                    blue: CGFloat(rgba.blue),
-                    alpha: 1.0
-                )
-                color.opacity = CGFloat(rgba.alpha)
-
-                for objectId in BioDigitalOrganMapper.objectIds(for: organ) {
-                    human.scene.color(objectId: objectId, color: color)
-                }
-            }
+            // Deterioro continuo del órgano en foco usando su Visualizer
+            // específico (HeartVisualizer / LungVisualizer / BrainVisualizer).
+            let damage = state.health(for: focus.organ).damageLevel
+            focus.apply(damage: damage, on: human)
         }
 
         #endif
@@ -269,6 +358,8 @@ extension BioDigitalHumanView.Coordinator: HKHumanDelegate {
     }
 
     nonisolated func human(_ view: HKHuman, objectPicked: String, position: [Double]) {
+        // DEBUG: imprimir el ID real tocado para poder mapearlo al Visualizer correspondiente.
+        print("🩺 [BioDigital] 🎯 objectPicked — ID REAL: \"\(objectPicked)\"")
         Task { @MainActor [weak self] in
             self?.onObjectPicked(objectPicked)
         }
