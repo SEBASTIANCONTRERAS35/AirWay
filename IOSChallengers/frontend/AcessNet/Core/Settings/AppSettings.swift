@@ -72,19 +72,6 @@ class AppSettings: ObservableObject {
     @AppStorage("enableSmartNotifications")
     var enableSmartNotifications: Bool = false
 
-    // MARK: - Weather Simulation
-
-    /// Modo de clima simulado (afecta el fondo del home)
-    @AppStorage("weatherSimModeRaw")
-    var weatherSimModeRaw: String = WeatherSimMode.airWay.rawValue {
-        willSet { objectWillChange.send() }
-    }
-
-    var weatherSimMode: WeatherSimMode {
-        get { WeatherSimMode(rawValue: weatherSimModeRaw) ?? .airWay }
-        set { weatherSimModeRaw = newValue.rawValue }
-    }
-
     // MARK: - Private Init
 
     private init() {

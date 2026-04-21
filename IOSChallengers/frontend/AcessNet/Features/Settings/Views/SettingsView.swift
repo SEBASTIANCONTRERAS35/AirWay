@@ -162,41 +162,6 @@ struct SettingsView: View {
                         .background(Color.white.opacity(0.1))
                         .padding(.vertical, 24)
 
-                    // Weather Simulation Section
-                    VStack(alignment: .leading, spacing: 16) {
-                        Text("WEATHER SIMULATION")
-                            .font(.subheadline)
-                            .foregroundColor(.white.opacity(0.7))
-                            .tracking(1)
-
-                        Text("Cambia el ambiente visual del Home. \"AirWay\" usa la paleta premium de la página web.")
-                            .font(.caption)
-                            .foregroundColor(.white.opacity(0.55))
-                            .fixedSize(horizontal: false, vertical: true)
-
-                        LazyVGrid(
-                            columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())],
-                            spacing: 12
-                        ) {
-                            ForEach(WeatherSimMode.allCases) { mode in
-                                WeatherModeChip(
-                                    mode: mode,
-                                    isSelected: appSettings.weatherSimMode == mode
-                                ) {
-                                    withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-                                        appSettings.weatherSimMode = mode
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    .padding(.horizontal)
-                    .padding(.bottom, 8)
-
-                    Divider()
-                        .background(Color.white.opacity(0.1))
-                        .padding(.vertical, 24)
-
                     // Performance Section
                     VStack(alignment: .leading, spacing: 0) {
                         SectionHeader(title: "PERFORMANCE")
@@ -389,49 +354,6 @@ struct SectionHeader: View {
             .foregroundColor(.white.opacity(0.7))
             .tracking(1)
             .padding(.horizontal)
-    }
-}
-
-struct WeatherModeChip: View {
-    let mode: WeatherSimMode
-    let isSelected: Bool
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            VStack(spacing: 8) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 14)
-                        .fill(mode.backgroundGradient)
-                        .frame(height: 56)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 14)
-                                .stroke(isSelected ? mode.accent : .white.opacity(0.18),
-                                        lineWidth: isSelected ? 2 : 1)
-                        )
-
-                    Image(systemName: mode.sfIcon)
-                        .font(.title3)
-                        .foregroundColor(mode.accent)
-                        .shadow(color: .black.opacity(0.3), radius: 2)
-                }
-
-                Text(mode.displayName)
-                    .font(.caption.weight(isSelected ? .bold : .medium))
-                    .foregroundColor(isSelected ? .white : .white.opacity(0.75))
-
-                if isSelected {
-                    Circle()
-                        .fill(mode.accent)
-                        .frame(width: 6, height: 6)
-                } else {
-                    Circle()
-                        .fill(Color.clear)
-                        .frame(width: 6, height: 6)
-                }
-            }
-        }
-        .buttonStyle(.plain)
     }
 }
 
