@@ -133,6 +133,10 @@ extension BioDigitalHumanView {
         var bodyState: BodyHealthState?
         var modelDidLoad: Bool = false
 
+        /// Cola de modelos a intentar. Si el primario falla con `modelLoadError`,
+        /// probamos el siguiente automáticamente.
+        private var pendingModelIds: [String] = []
+
         #if HAS_HUMANKIT
         var human: HKHuman?
         private var validationObserver: NSObjectProtocol?
@@ -189,16 +193,28 @@ extension BioDigitalHumanView {
             body.delegate = self
             self.human = body
 
+            // Inicializar cola: modelo primario + fallbacks.
+            pendingModelIds = [BioDigitalConfig.defaultModelId] + BioDigitalConfig.fallbackModelIds
+
             // El ejemplo oficial de BioDigital inserta un delay de 1s para
-            // dar tiempo a que el WebView interno del SDK termine de configurarse
-            // antes de llamar `load(model:)`. El evento de completado lo
-            // notifica el delegate vía `human(_:modelLoaded:)`.
+            // dar tiempo a que el WebView interno del SDK termine de configurarse.
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
-                guard let self, let human = self.human else { return }
-                let modelId = BioDigitalConfig.defaultModelId
-                print("🩺 [BioDigital] load(model: \(modelId))")
-                human.load(model: modelId)
+                self?.loadNextModel()
             }
+        }
+
+        /// Intenta cargar el siguiente modelo de la cola. Si falla, se encadena
+        /// desde `human(_:modelLoadError:)`.
+        func loadNextModel() {
+            guard let human else { return }
+            guard let next = pendingModelIds.first else {
+                print("🩺 [BioDigital] ❌ ningún modelo cargó — revisa permisos del tier")
+                onLoadError(String(localized: "Ningún modelo disponible para tu plan BioDigital."))
+                return
+            }
+            pendingModelIds.removeFirst()
+            print("🩺 [BioDigital] load(model: \(next)) — quedan \(pendingModelIds.count) fallbacks")
+            human.load(model: next)
         }
 
         func applyBodyStateIfReady() {
@@ -242,9 +258,10 @@ extension BioDigitalHumanView.Coordinator: HKHumanDelegate {
     }
 
     nonisolated func human(_ view: HKHuman, modelLoadError: String) {
-        print("🩺 [BioDigital] ❌ modelLoadError: \(modelLoadError)")
+        print("🩺 [BioDigital] ⚠️ modelLoadError: \(modelLoadError) — probando fallback")
         Task { @MainActor [weak self] in
-            self?.onLoadError(modelLoadError)
+            // Si hay más modelos pendientes, intentar el siguiente. Si no, fallar.
+            self?.loadNextModel()
         }
     }
 

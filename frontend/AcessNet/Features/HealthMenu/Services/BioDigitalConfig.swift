@@ -22,10 +22,19 @@ enum BioDigitalConfig {
         Bundle.main.url(forResource: "BioDigital", withExtension: "plist") != nil
     }
 
-    /// Modelo por defecto a cargar. Flu = sistema respiratorio — relevante
-    /// para contexto de calidad del aire.
+    /// Modelo por defecto a cargar. Usamos el ID corto `3Y78` que aparece
+    /// documentado como modelo público/demo en la integración oficial de
+    /// ResearchKit de BioDigital. Los paths largos tipo
+    /// `production/maleAdult/flu.json` pueden requerir licencias premium.
     // TODO: permitir override por usuario / por estado de salud
-    static let defaultModelId = "production/maleAdult/flu.json"
+    static let defaultModelId = "3Y78"
+
+    /// Fallbacks a probar si el modelo primario falla.
+    static let fallbackModelIds: [String] = [
+        "production/maleAdult/flu.json",
+        "production/maleAdult/heart.json",
+        "production/maleAdult/skeleton.json"
+    ]
 
     /// Lectura opcional para debug — útil para imprimir en consola qué keys
     /// quedaron realmente en el plist al runtime.
