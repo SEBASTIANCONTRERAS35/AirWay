@@ -40,7 +40,7 @@ final class ObjectCaptureCoordinator {
     private var stateObservationTask: Task<Void, Never>?
     private var passObservationTask: Task<Void, Never>?
 
-    private let log = Logger(subsystem: "xyz.KOmbo.AirWay", category: "ObjectCapture")
+    private let log = Logger(subsystem: "xyz.kombo.airway.accessnet", category: "ObjectCapture")
 
     // MARK: - Support
 

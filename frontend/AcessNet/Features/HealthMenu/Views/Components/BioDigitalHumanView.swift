@@ -4,18 +4,24 @@
 //
 //  SwiftUI wrapper alrededor del SDK BioDigital HumanKit (XCFramework nativo).
 //
+//  ── Requisitos según la documentación oficial ────────────────────────
+//  1. Archivo `BioDigital.plist` en el bundle con APIKey y APISecret
+//     (NO en Info.plist — el SDK lee de `BioDigital.plist` explícitamente).
+//  2. Llamada a `HKServices.shared.setup(delegate:)` en el AppDelegate
+//     (ver `AcessNetApp.swift`).
+//  3. Instanciar `HKHuman(view:)` SOLO después de recibir `onValidSDK`.
+//  4. Llamar `human.load(model:) { ... }` con un modelo válido.
+//
 //  ── Activación del SDK ──────────────────────────────────────────────
 //  El SDK se integra vía Swift Package Manager:
 //    https://github.com/biodigital-inc/HumanKit.git   (≥ 164.3)
 //
-//  Hasta que el paquete esté enlazado al target, este archivo compila en
-//  modo PLACEHOLDER (render SceneKit básico + mensaje "SDK no enlazado").
-//  Para activar el SDK real: agregar el paquete en Xcode y añadir la flag
-//  de compilación `HAS_HUMANKIT` en Build Settings → Swift Compiler → Custom
-//  Flags → Active Compilation Conditions.
+//  Sin el paquete enlazado este archivo compila en modo PLACEHOLDER.
+//  Para activar: Build Settings → Active Compilation Conditions → HAS_HUMANKIT.
 //
 
 import SwiftUI
+import UIKit
 import SceneKit
 
 #if HAS_HUMANKIT
@@ -24,7 +30,7 @@ import HumanKit
 
 // MARK: - SwiftUI Wrapper
 
-struct BioDigitalHumanView: UIViewControllerRepresentable {
+struct BioDigitalHumanView: UIViewRepresentable {
 
     var bodyState: BodyHealthState
     var onModelReady: () -> Void
@@ -39,42 +45,98 @@ struct BioDigitalHumanView: UIViewControllerRepresentable {
         )
     }
 
-    func makeUIViewController(context: Context) -> UIViewController {
+    func makeUIView(context: Context) -> UIView {
         #if HAS_HUMANKIT
-        return BioDigitalHumanViewControllerReal(coordinator: context.coordinator)
+        let canvas = UIView()
+        canvas.backgroundColor = .clear
+        canvas.translatesAutoresizingMaskIntoConstraints = false
+        context.coordinator.canvas = canvas
+
+        // Si el SDK ya validó (app lleva tiempo abierta) → crear HKHuman
+        // inmediatamente. Si no, esperar la notificación de validación.
+        if BioDigitalSDKObserver.shared.isValidSDK {
+            context.coordinator.attachHumanIfNeeded()
+        } else if BioDigitalSDKObserver.shared.hasResolved {
+            // Ya respondió con invalidSDK — nada que hacer.
+            context.coordinator.onLoadError(
+                String(localized: "SDK BioDigital rechazó las credenciales. Revisa BioDigital.plist y bundle ID.")
+            )
+        }
+
+        context.coordinator.observeSDKValidation()
+        return canvas
         #else
-        return BioDigitalPlaceholderController()
+        return makePlaceholderView()
         #endif
     }
 
-    func updateUIViewController(_ uiViewController: UIViewController, context: Context) {
+    func updateUIView(_ uiView: UIView, context: Context) {
         context.coordinator.bodyState = bodyState
         #if HAS_HUMANKIT
-        (uiViewController as? BioDigitalHumanViewControllerReal)?.apply(bodyState: bodyState)
+        context.coordinator.applyBodyStateIfReady()
         #endif
     }
 
-    /// Pide al SDK resetear la cámara al estado inicial. Se llama desde el
-    /// botón flotante de la pantalla.
-    static func resetCamera(on controller: UIViewController) {
-        #if HAS_HUMANKIT
-        (controller as? BioDigitalHumanViewControllerReal)?.resetCamera()
-        #endif
+    #if !HAS_HUMANKIT
+    private func makePlaceholderView() -> UIView {
+        let container = UIView()
+        container.backgroundColor = .clear
+
+        let scnView = SCNView()
+        scnView.backgroundColor = .clear
+        scnView.autoenablesDefaultLighting = true
+        scnView.allowsCameraControl = true
+        scnView.antialiasingMode = .multisampling4X
+        scnView.translatesAutoresizingMaskIntoConstraints = false
+        let scene = SCNScene()
+        let capsule = SCNCapsule(capRadius: 0.35, height: 1.6)
+        capsule.firstMaterial?.diffuse.contents = UIColor(white: 0.85, alpha: 0.95)
+        let node = SCNNode(geometry: capsule)
+        scene.rootNode.addChildNode(node)
+        scnView.scene = scene
+        container.addSubview(scnView)
+
+        let label = UILabel()
+        label.text = "SDK BioDigital no enlazado\nAgrega HumanKit vía SPM y activa HAS_HUMANKIT"
+        label.numberOfLines = 0
+        label.textAlignment = .center
+        label.textColor = UIColor.white.withAlphaComponent(0.65)
+        label.font = .systemFont(ofSize: 11, weight: .medium)
+        label.translatesAutoresizingMaskIntoConstraints = false
+        container.addSubview(label)
+
+        NSLayoutConstraint.activate([
+            scnView.topAnchor.constraint(equalTo: container.topAnchor),
+            scnView.bottomAnchor.constraint(equalTo: container.bottomAnchor),
+            scnView.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+            scnView.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+            label.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 24),
+            label.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -24),
+            label.bottomAnchor.constraint(equalTo: container.bottomAnchor, constant: -20)
+        ])
+        return container
     }
+    #endif
 }
 
 // MARK: - Coordinator
 
 extension BioDigitalHumanView {
 
-    final class Coordinator {
+    @MainActor
+    final class Coordinator: NSObject {
         let onModelReady: () -> Void
         let onLoadError: (String) -> Void
         let onObjectPicked: (String) -> Void
 
-        /// Última versión del estado conocido. El VC real lo usa para pintar
-        /// una vez que el modelo ha terminado de cargar.
+        weak var canvas: UIView?
         var bodyState: BodyHealthState?
+        var modelDidLoad: Bool = false
+
+        #if HAS_HUMANKIT
+        var human: HKHuman?
+        private var validationObserver: NSObjectProtocol?
+        #endif
 
         init(
             onModelReady: @escaping () -> Void,
@@ -85,184 +147,117 @@ extension BioDigitalHumanView {
             self.onLoadError = onLoadError
             self.onObjectPicked = onObjectPicked
         }
+
+        deinit {
+            #if HAS_HUMANKIT
+            if let observer = validationObserver {
+                NotificationCenter.default.removeObserver(observer)
+            }
+            #endif
+        }
+
+        func observeSDKValidation() {
+            #if HAS_HUMANKIT
+            guard validationObserver == nil else { return }
+            validationObserver = NotificationCenter.default.addObserver(
+                forName: BioDigitalSDKObserver.didChangeNotification,
+                object: nil,
+                queue: .main
+            ) { [weak self] _ in
+                guard let self else { return }
+                Task { @MainActor in
+                    if BioDigitalSDKObserver.shared.isValidSDK {
+                        self.attachHumanIfNeeded()
+                    } else {
+                        self.onLoadError(
+                            String(localized: "SDK BioDigital rechazó las credenciales.")
+                        )
+                    }
+                }
+            }
+            #endif
+        }
+
+        #if HAS_HUMANKIT
+
+        /// Crea `HKHuman` y dispara el load del modelo si aún no se ha hecho.
+        func attachHumanIfNeeded() {
+            guard human == nil, let canvas else { return }
+
+            print("🩺 [BioDigital] SDK válido — creando HKHuman y cargando modelo")
+            let body = HKHuman(view: canvas)
+            body.delegate = self
+            self.human = body
+
+            // El ejemplo oficial de BioDigital inserta un delay de 1s para
+            // dar tiempo a que el WebView interno del SDK termine de configurarse
+            // antes de llamar `load(model:)`. El evento de completado lo
+            // notifica el delegate vía `human(_:modelLoaded:)`.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
+                guard let self, let human = self.human else { return }
+                let modelId = BioDigitalConfig.defaultModelId
+                print("🩺 [BioDigital] load(model: \(modelId))")
+                human.load(model: modelId)
+            }
+        }
+
+        func applyBodyStateIfReady() {
+            guard modelDidLoad, let human, let state = bodyState else { return }
+
+            for organ in BodyHealthState.Organ.allCases {
+                let health = state.health(for: organ)
+                let rgba = BioDigitalOrganMapper.highlightColor(for: health.damageLevel)
+                let color = HKColor()
+                color.tint = UIColor(
+                    red: CGFloat(rgba.red),
+                    green: CGFloat(rgba.green),
+                    blue: CGFloat(rgba.blue),
+                    alpha: 1.0
+                )
+                color.opacity = CGFloat(rgba.alpha)
+
+                for objectId in BioDigitalOrganMapper.objectIds(for: organ) {
+                    human.scene.color(objectId: objectId, color: color)
+                }
+            }
+        }
+
+        #endif
     }
 }
 
-// MARK: - Implementación real (compila solo con HAS_HUMANKIT)
+// MARK: - HKHumanDelegate (solo con SDK enlazado)
 
 #if HAS_HUMANKIT
 
-final class BioDigitalHumanViewControllerReal: UIViewController, HKHumanDelegate, HKServicesDelegate {
+extension BioDigitalHumanView.Coordinator: HKHumanDelegate {
 
-    private let canvasView = UIView()
-    private var human: HKHuman?
-    private let coordinator: BioDigitalHumanView.Coordinator
-
-    init(coordinator: BioDigitalHumanView.Coordinator) {
-        self.coordinator = coordinator
-        super.init(nibName: nil, bundle: nil)
-    }
-
-    @available(*, unavailable)
-    required init?(coder: NSCoder) { fatalError() }
-
-    override func viewDidLoad() {
-        super.viewDidLoad()
-        view.backgroundColor = .clear
-        canvasView.backgroundColor = .clear
-        canvasView.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(canvasView)
-        NSLayoutConstraint.activate([
-            canvasView.topAnchor.constraint(equalTo: view.topAnchor),
-            canvasView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
-            canvasView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            canvasView.trailingAnchor.constraint(equalTo: view.trailingAnchor)
-        ])
-
-        guard BioDigitalConfig.isConfigured else {
-            coordinator.onLoadError(
-                String(localized: "Credenciales de BioDigital no configuradas.")
-            )
-            return
-        }
-
-        // TODO: confirmar la firma exacta del init del SDK (v164.3).
-        // En v147 era `HKHuman(view: UIView)`; en v164+ puede requerir
-        // canvas + apiKey en el init. Ajustar cuando se enlace el paquete.
-        let human = HKHuman(view: canvasView)
-        human.delegate = self
-        self.human = human
-    }
-
-    override func viewDidDisappear(_ animated: Bool) {
-        super.viewDidDisappear(animated)
-        human?.unload()
-    }
-
-    // MARK: Public API
-
-    func apply(bodyState: BodyHealthState) {
-        guard let human else { return }
-        for organ in BodyHealthState.Organ.allCases {
-            let health = bodyState.health(for: organ)
-            let rgba = BioDigitalOrganMapper.highlightColor(for: health.damageLevel)
-            let color = HKColor()
-            color.tint = UIColor(
-                red: CGFloat(rgba.red),
-                green: CGFloat(rgba.green),
-                blue: CGFloat(rgba.blue),
-                alpha: 1.0
-            )
-            color.opacity = CGFloat(rgba.alpha)
-            for objectId in BioDigitalOrganMapper.objectIds(for: organ) {
-                human.scene.color(objectId: objectId, color: color)
-            }
+    nonisolated func human(_ view: HKHuman, modelLoaded: String) {
+        print("🩺 [BioDigital] HKHumanDelegate.modelLoaded: \(modelLoaded)")
+        Task { @MainActor [weak self] in
+            self?.modelDidLoad = true
+            self?.onModelReady()
+            self?.applyBodyStateIfReady()
         }
     }
 
-    func resetCamera() {
-        human?.camera.reset()
-    }
-
-    // MARK: HKServicesDelegate
-
-    func onValidSDK() { /* no-op */ }
-
-    func onInvalidSDK() {
-        coordinator.onLoadError(
-            String(localized: "API key de BioDigital inválida.")
-        )
-    }
-
-    // MARK: HKHumanDelegate
-
-    func human(_ view: HKHuman, modelLoaded: String) {
-        coordinator.onModelReady()
-        if let state = coordinator.bodyState {
-            apply(bodyState: state)
+    nonisolated func human(_ view: HKHuman, modelLoadError: String) {
+        print("🩺 [BioDigital] ❌ modelLoadError: \(modelLoadError)")
+        Task { @MainActor [weak self] in
+            self?.onLoadError(modelLoadError)
         }
     }
 
-    func human(_ view: HKHuman, modelLoadError: String) {
-        coordinator.onLoadError(modelLoadError)
+    nonisolated func human(_ view: HKHuman, objectPicked: String, position: [Double]) {
+        Task { @MainActor [weak self] in
+            self?.onObjectPicked(objectPicked)
+        }
     }
 
-    func human(_ view: HKHuman, objectPicked: String, position: [Double]) {
-        coordinator.onObjectPicked(objectPicked)
-    }
-
-    func human(_ view: HKHuman, initScene: String) { /* no-op */ }
-    func human(_ view: HKHuman, objectColor: String, color: HKColor) { /* no-op */ }
-    func human(_ view: HKHuman, chapterTransition: String) { /* no-op */ }
-    func human(_ view: HKHuman, animationComplete: Bool) { /* no-op */ }
-}
-
-#endif
-
-// MARK: - Placeholder (se usa mientras HAS_HUMANKIT está desactivado)
-
-#if !HAS_HUMANKIT
-
-final class BioDigitalPlaceholderController: UIViewController {
-
-    private let sceneView = SCNView()
-    private let messageLabel = UILabel()
-
-    override func viewDidLoad() {
-        super.viewDidLoad()
-        view.backgroundColor = .clear
-        setupScene()
-        setupMessage()
-    }
-
-    private func setupScene() {
-        sceneView.translatesAutoresizingMaskIntoConstraints = false
-        sceneView.backgroundColor = .clear
-        sceneView.autoenablesDefaultLighting = true
-        sceneView.allowsCameraControl = true
-        sceneView.antialiasingMode = .multisampling4X
-        sceneView.scene = makeScene()
-        view.addSubview(sceneView)
-        NSLayoutConstraint.activate([
-            sceneView.topAnchor.constraint(equalTo: view.topAnchor),
-            sceneView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
-            sceneView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            sceneView.trailingAnchor.constraint(equalTo: view.trailingAnchor)
-        ])
-    }
-
-    private func makeScene() -> SCNScene {
-        let scene = SCNScene()
-        let torso = SCNCapsule(capRadius: 0.35, height: 1.6)
-        torso.firstMaterial?.diffuse.contents = UIColor(white: 0.85, alpha: 0.95)
-        torso.firstMaterial?.lightingModel = .physicallyBased
-        let node = SCNNode(geometry: torso)
-        scene.rootNode.addChildNode(node)
-
-        let camera = SCNCamera()
-        camera.fieldOfView = 40
-        let cameraNode = SCNNode()
-        cameraNode.camera = camera
-        cameraNode.position = SCNVector3(0, 0, 3.2)
-        scene.rootNode.addChildNode(cameraNode)
-
-        return scene
-    }
-
-    private func setupMessage() {
-        messageLabel.translatesAutoresizingMaskIntoConstraints = false
-        messageLabel.text = "SDK BioDigital no enlazado\nAgrega HumanKit vía SPM y activa la flag HAS_HUMANKIT"
-        messageLabel.numberOfLines = 0
-        messageLabel.textAlignment = .center
-        messageLabel.textColor = UIColor.white.withAlphaComponent(0.65)
-        messageLabel.font = .systemFont(ofSize: 11, weight: .medium)
-        view.addSubview(messageLabel)
-        NSLayoutConstraint.activate([
-            messageLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 24),
-            messageLabel.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -24),
-            messageLabel.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: -20)
-        ])
-    }
+    nonisolated func human(_ view: HKHuman, initScene: String) {}
+    nonisolated func human(_ view: HKHuman, objectColor: String, color: HKColor) {}
+    nonisolated func human(_ view: HKHuman, chapterTransition: String) {}
+    nonisolated func human(_ view: HKHuman, animationComplete: Bool) {}
 }
 
 #endif

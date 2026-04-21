@@ -68,7 +68,7 @@ struct BodyScanHubView: View {
                 }
                 Spacer()
                 if !hideChrome {
-                    if selectedMode == .saved && storage.hasSavedScan {
+                    if selectedMode == .saved {
                         healthMenuCTA
                             .padding(.horizontal, 28)
                             .padding(.bottom, 12)

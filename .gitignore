@@ -92,3 +92,7 @@ backend-api/data/models/xgb_metrics.json
 *.tmp
 *.temp
 .cache/
+
+# BioDigital SDK credentials
+**/BioDigital.plist
+!**/BioDigital.example.plist

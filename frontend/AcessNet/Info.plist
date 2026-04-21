@@ -2,11 +2,11 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>NSCameraUsageDescription</key>
-	<string>AcessNet usa la cámara para visualizar partículas PM2.5 en realidad aumentada y para escanear el cuerpo humano con LiDAR (body tracking 3D y mapeo de malla).</string>
-	<!-- Permitir HTTP sólo a localhost (para test del backend local). Producción usa HTTPS. -->
+	<!-- BioDigital HumanKit lee credenciales de BioDigital.plist, NO de aquí. -->
 	<key>NSAppTransportSecurity</key>
 	<dict>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
 		<key>NSExceptionDomains</key>
 		<dict>
 			<key>localhost</key>

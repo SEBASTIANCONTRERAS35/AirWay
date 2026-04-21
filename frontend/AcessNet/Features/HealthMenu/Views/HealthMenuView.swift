@@ -137,19 +137,12 @@ struct HealthMenuView: View {
             if let error = viewModel.loadError, viewModel.isModelReady == false {
                 errorState(message: error)
             } else {
-                AnatomicalModelView(
-                    modelName: "anatomy_body",
-                    bodyState: viewModel.bodyState,
-                    onModelReady: viewModel.handleModelReady,
-                    onLoadError: viewModel.handleLoadError,
-                    onFallbackNotice: viewModel.handleFallbackNotice,
-                    onOrganPicked: viewModel.didSelectOrgan
-                )
-                .id(modelContainerRef)
-                .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
-                .accessibilityLabel(String(localized: "Modelo 3D del cuerpo humano. Toca un órgano para ver su estado."))
-                .overlay(loadingOverlay, alignment: .center)
-                .overlay(fallbackBanner, alignment: .top)
+                anatomicalRenderer
+                    .id(modelContainerRef)
+                    .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
+                    .accessibilityLabel(String(localized: "Modelo 3D del cuerpo humano. Toca un órgano para ver su estado."))
+                    .overlay(loadingOverlay, alignment: .center)
+                    .overlay(fallbackBanner, alignment: .top)
             }
 
             VStack {
@@ -163,6 +156,38 @@ struct HealthMenuView: View {
             .padding(14)
         }
         .frame(height: height)
+    }
+
+    /// Selecciona el renderer 3D según la flag de compilación `HAS_HUMANKIT`.
+    /// Con el SDK enlazado + credenciales → usa `BioDigitalHumanView`.
+    /// Sin SDK → fallback al `AnatomicalModelView` (SceneKit nativo).
+    @ViewBuilder
+    private var anatomicalRenderer: some View {
+        #if HAS_HUMANKIT
+        if BioDigitalConfig.isConfigured {
+            BioDigitalHumanView(
+                bodyState: viewModel.bodyState,
+                onModelReady: viewModel.handleModelReady,
+                onLoadError: viewModel.handleLoadError,
+                onObjectPicked: viewModel.didPickObject
+            )
+        } else {
+            anatomicalFallback
+        }
+        #else
+        anatomicalFallback
+        #endif
+    }
+
+    private var anatomicalFallback: some View {
+        AnatomicalModelView(
+            modelName: "anatomy_body",
+            bodyState: viewModel.bodyState,
+            onModelReady: viewModel.handleModelReady,
+            onLoadError: viewModel.handleLoadError,
+            onFallbackNotice: viewModel.handleFallbackNotice,
+            onOrganPicked: viewModel.didSelectOrgan
+        )
     }
 
     /// Banner discreto cuando el modelo USDZ no existe y estamos en fallback.

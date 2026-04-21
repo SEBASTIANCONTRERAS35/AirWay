@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  BioDigital.example.plist — plantilla pública.
+
+  Uso:
+    1. Duplica este archivo como BioDigital.plist en la misma carpeta.
+    2. Reemplaza los placeholders con tu API Key y Secret reales obtenidas
+       en https://developer.biodigital.com → tu app.
+    3. NO commitees BioDigital.plist (ya está en .gitignore).
+    4. Asegúrate de que BioDigital.plist está incluido en el Application
+       Bundle (Target → Build Phases → Copy Bundle Resources).
+
+  El SDK HumanKit lee estas claves al llamar `HKServices.shared.setup(...)`
+  desde el AppDelegate / @main struct.
+-->
+<plist version="1.0">
+<dict>
+	<key>APIKey</key>
+	<string>your_developer_key_here</string>
+	<key>APISecret</key>
+	<string>your_developer_secret_here</string>
+</dict>
+</plist>

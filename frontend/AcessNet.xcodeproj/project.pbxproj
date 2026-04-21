@@ -10,6 +10,7 @@
 		09818B110EC04CD85CFAD96B /* WatchConnectivity.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 853CB617A120405AA888FF70 /* WatchConnectivity.framework */; };
 		0D5ACE4C5199CAE3AC17B14D /* AirWayWatch Watch App.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = CA5BA9FC466FCC4E715E5924 /* AirWayWatch Watch App.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		9D078957F3FA0F93980A0B33 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = E969B84657CEC6858660F838 /* Foundation.framework */; };
+		AA46A6BE2F96FD580070F8C7 /* HumanKit in Frameworks */ = {isa = PBXBuildFile; productRef = AA46A6BD2F96FD580070F8C7 /* HumanKit */; };
 		AA6EEBA72F96C44F008C08D0 /* HumanKit in Frameworks */ = {isa = PBXBuildFile; productRef = AA6EEBA62F96C44F008C08D0 /* HumanKit */; };
 		F1F20DA82A0669D385696AFB /* HealthKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C8B23D7491A144B87C0D0ADA /* HealthKit.framework */; };
 /* End PBXBuildFile section */
@@ -68,10 +69,17 @@
 		262196AE2E80F9DB007E3787 /* Exceptions for "AcessNet" folder in "AirWay" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
-				Info.plist,
 				Features/HealthMenu/Resources/README.md,
+				Info.plist,
 			);
 			target = 2621969B2E80F60C007E3787 /* AirWay */;
+		};
+		AA46A6BB2F96FBB10070F8C7 /* Exceptions for "AcessNet" folder in "AirWayWatch Watch App" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				BioDigital.plist,
+			);
+			target = A381EE02877A5BA1523726CC /* AirWayWatch Watch App */;
 		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
@@ -80,6 +88,7 @@
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
 				262196AE2E80F9DB007E3787 /* Exceptions for "AcessNet" folder in "AirWay" target */,
+				AA46A6BB2F96FBB10070F8C7 /* Exceptions for "AcessNet" folder in "AirWayWatch Watch App" target */,
 			);
 			path = AcessNet;
 			sourceTree = "<group>";
@@ -97,6 +106,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				AA6EEBA72F96C44F008C08D0 /* HumanKit in Frameworks */,
+				AA46A6BE2F96FD580070F8C7 /* HumanKit in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -297,7 +307,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				AADDC5602F90C21400D74999 /* XCRemoteSwiftPackageReference "lottie-ios" */,
-				AA6EEBA52F96C44F008C08D0 /* XCRemoteSwiftPackageReference "HumanKit" */,
+				AA46A6BC2F96FD580070F8C7 /* XCRemoteSwiftPackageReference "HumanKit" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 2621969D2E80F60C007E3787 /* Products */;
@@ -356,6 +366,8 @@
 /* Begin XCBuildConfiguration section */
 		262196A52E80F60D007E3787 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReferenceAnchor = 2621969E2E80F60C007E3787 /* AcessNet */;
+			baseConfigurationReferenceRelativePath = Secrets.xcconfig;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
@@ -413,13 +425,15 @@
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
 				SDKROOT = iphoneos;
-				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited) HAS_HUMANKIT";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 			};
 			name = Debug;
 		};
 		262196A62E80F60D007E3787 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReferenceAnchor = 2621969E2E80F60C007E3787 /* AcessNet */;
+			baseConfigurationReferenceRelativePath = Secrets.xcconfig;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
@@ -470,6 +484,7 @@
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = HAS_HUMANKIT;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				VALIDATE_PRODUCT = YES;
 			};
@@ -477,6 +492,8 @@
 		};
 		262196A82E80F60D007E3787 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReferenceAnchor = 2621969E2E80F60C007E3787 /* AcessNet */;
+			baseConfigurationReferenceRelativePath = Secrets.xcconfig;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
@@ -486,6 +503,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = AcessNet/Info.plist;
+				INFOPLIST_KEY_NSCameraUsageDescription = "AcessNet usa la cámara para visualizar partículas PM2.5 en realidad aumentada y para escanear el cuerpo humano con LiDAR (body tracking 3D y mapeo de malla).";
 				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "Algorithm djisttra";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "\"Se necesita tu ubicación para mostrarla en el mapa.\"";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -498,7 +516,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = xyz.KOmbo.AirWay;
+				PRODUCT_BUNDLE_IDENTIFIER = xyz.kombo.airway.accessnet;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited) HAS_HUMANKIT";
@@ -513,6 +531,8 @@
 		};
 		262196A92E80F60D007E3787 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReferenceAnchor = 2621969E2E80F60C007E3787 /* AcessNet */;
+			baseConfigurationReferenceRelativePath = Secrets.xcconfig;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
@@ -522,6 +542,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = AcessNet/Info.plist;
+				INFOPLIST_KEY_NSCameraUsageDescription = "AcessNet usa la cámara para visualizar partículas PM2.5 en realidad aumentada y para escanear el cuerpo humano con LiDAR (body tracking 3D y mapeo de malla).";
 				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "Algorithm djisttra";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "\"Se necesita tu ubicación para mostrarla en el mapa.\"";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -534,7 +555,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = xyz.KOmbo.AirWay;
+				PRODUCT_BUNDLE_IDENTIFIER = xyz.kombo.airway.accessnet;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = HAS_HUMANKIT;
@@ -549,6 +570,8 @@
 		};
 		4BFC28CAE8BE52BD32192199 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReferenceAnchor = 2621969E2E80F60C007E3787 /* AcessNet */;
+			baseConfigurationReferenceRelativePath = Secrets.xcconfig;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
@@ -562,13 +585,13 @@
 				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "AirWay saves your PPI Score to track pollution impact over time.";
 				INFOPLIST_KEY_WKApplication = YES;
 				INFOPLIST_KEY_WKBackgroundModes = "workout-processing";
-				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = xyz.KOmbo.AirWay;
+				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = xyz.kombo.airway.accessnet;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = xyz.KOmbo.AirWay.watchkitapp;
+				PRODUCT_BUNDLE_IDENTIFIER = xyz.kombo.airway.accessnet.watchkitapp;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = watchos;
 				SKIP_INSTALL = YES;
@@ -584,6 +607,8 @@
 		};
 		B25BD0D9454B5275EABC8C6A /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReferenceAnchor = 2621969E2E80F60C007E3787 /* AcessNet */;
+			baseConfigurationReferenceRelativePath = Secrets.xcconfig;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
@@ -597,14 +622,14 @@
 				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "AirWay saves your PPI Score to track pollution impact over time.";
 				INFOPLIST_KEY_WKApplication = YES;
 				INFOPLIST_KEY_WKBackgroundModes = "workout-processing";
-				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = xyz.KOmbo.AirWay;
+				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = xyz.kombo.airway.accessnet;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
 				ONLY_ACTIVE_ARCH = YES;
-				PRODUCT_BUNDLE_IDENTIFIER = xyz.KOmbo.AirWay.watchkitapp;
+				PRODUCT_BUNDLE_IDENTIFIER = xyz.kombo.airway.accessnet.watchkitapp;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = watchos;
 				SKIP_INSTALL = YES;
@@ -651,6 +676,14 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
+		AA46A6BC2F96FD580070F8C7 /* XCRemoteSwiftPackageReference "HumanKit" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/biodigital-inc/HumanKit.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 147.0.11;
+			};
+		};
 		AA6EEBA52F96C44F008C08D0 /* XCRemoteSwiftPackageReference "HumanKit" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/biodigital-inc/HumanKit.git";
@@ -670,6 +703,11 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		AA46A6BD2F96FD580070F8C7 /* HumanKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = AA46A6BC2F96FD580070F8C7 /* XCRemoteSwiftPackageReference "HumanKit" */;
+			productName = HumanKit;
+		};
 		AA6EEBA62F96C44F008C08D0 /* HumanKit */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = AA6EEBA52F96C44F008C08D0 /* XCRemoteSwiftPackageReference "HumanKit" */;
